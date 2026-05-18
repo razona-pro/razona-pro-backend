@@ -1,0 +1,11 @@
+package com.razonapro.razonaprobackend.models.ids;
+
+import lombok.*;
+import java.io.Serializable;
+
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @EqualsAndHashCode
+public class OptionId implements Serializable {
+    private String competenceId;
+    private String questionId;
+    private String optionId;
+}
