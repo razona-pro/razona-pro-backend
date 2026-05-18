@@ -9,6 +9,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Configuration
@@ -35,12 +36,14 @@ public class CorsConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        List<String> origins = Arrays.asList(allowedOrigins.split(","));
+
+        List<String> origins = Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)          // añadir trim
+                .collect(Collectors.toList());
+
         config.setAllowedOrigins(origins);
         config.setAllowedMethods(Arrays.asList(allowedMethods.split(",")));
-        config.setAllowedHeaders(allowedHeaders.equals("*")
-            ? List.of("*")
-            : Arrays.asList(allowedHeaders.split(",")));
+        config.setAllowedHeaders(List.of("*"));
         config.setExposedHeaders(Arrays.asList(exposedHeaders.split(",")));
         config.setAllowCredentials(allowCredentials);
         config.setMaxAge(maxAge);
