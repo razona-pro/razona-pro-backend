@@ -6,6 +6,6 @@ import lombok.Setter;
 
 @Getter @Setter
 public class OptionRequest {
-    @NotBlank @Size(max = 200) private String optionText;
+    @NotBlank @Size(max = 300) private String optionText;
     @NotNull                   private Boolean isCorrect;
 }

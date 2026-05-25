@@ -30,10 +30,10 @@ public class Question {
     @JoinColumn(name = "admin_id")
     private Admin admin;
 
-    @Column(name = "statement", length = 300, nullable = false)
+    @Column(name = "statement", length = 2000, nullable = false)
     private String statement;
 
-    @Column(name = "explanation", length = 200)
+    @Column(name = "explanation", length = 2000)
     private String explanation;
 
     @Column(name = "source", length = 50)

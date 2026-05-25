@@ -30,7 +30,7 @@ public class Option {
     })
     private Question question;
 
-    @Column(name = "option_text", length = 200, nullable = false)
+    @Column(name = "option_text", length = 300, nullable = false)
     private String optionText;
 
     @Convert(converter = BooleanToYNConverter.class)

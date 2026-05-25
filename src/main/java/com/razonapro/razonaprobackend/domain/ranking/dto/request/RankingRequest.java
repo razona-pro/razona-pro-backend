@@ -10,7 +10,7 @@ public class RankingRequest {
     @Size(max = 100)           private String description;
 
     @NotBlank
-    @Pattern(regexp = "^(WEEKLY|MONTHLY|GENERAL)$")
+    @Pattern(regexp = "^(DAILY|WEEKLY|MONTHLY|GENERAL)$")
     private String periodType;
 
     @NotBlank

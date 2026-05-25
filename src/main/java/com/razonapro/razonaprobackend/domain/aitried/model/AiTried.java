@@ -49,6 +49,6 @@ public class AiTried {
     @Builder.Default
     private LocalDateTime attemptTimestamp = LocalDateTime.now();
 
-    @Column(name = "description", length = 100)
+    @Column(name = "description", length = 200)
     private String description;
 }

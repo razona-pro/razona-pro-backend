@@ -10,11 +10,13 @@ import com.razonapro.razonaprobackend.domain.test.service.TestService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 
 @RestController
@@ -27,9 +29,13 @@ public class TestController {
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','STUDENT')")
     public ResponseEntity<ApiResponse<PagedResponse<TestDto>>> findAll(
-            @RequestParam(defaultValue = "0") int page,
+            @AuthenticationPrincipal UserPrincipal principal,
+            @RequestParam(defaultValue = "0")  int page,
             @RequestParam(defaultValue = "10") int size) {
-        return ResponseEntity.ok(ApiResponse.ok(testService.findAll(PageRequest.of(page, size))));
+        boolean isAdmin = principal.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        var pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        return ResponseEntity.ok(ApiResponse.ok(testService.findAll(pageable, !isAdmin)));
     }
 
     @GetMapping("/{testId}/{competenceId}")
@@ -39,7 +45,6 @@ public class TestController {
         return ResponseEntity.ok(ApiResponse.ok(testService.findById(testId, competenceId)));
     }
 
-    /** Devuelve preguntas del test (sin respuesta correcta para estudiante) */
     @GetMapping("/{testId}/{competenceId}/questions")
     @PreAuthorize("hasAnyRole('ADMIN','STUDENT')")
     public ResponseEntity<ApiResponse<List<QuestionDto>>> getQuestions(
@@ -47,9 +52,9 @@ public class TestController {
             @PathVariable String competenceId,
             @AuthenticationPrincipal UserPrincipal principal) {
         boolean showCorrect = principal.getAuthorities().stream()
-            .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
         return ResponseEntity.ok(ApiResponse.ok(
-            testService.getTestQuestions(testId, competenceId, showCorrect)));
+                testService.getTestQuestions(testId, competenceId, showCorrect)));
     }
 
     @PostMapping
@@ -58,7 +63,7 @@ public class TestController {
             @Valid @RequestBody TestRequest req,
             @AuthenticationPrincipal UserPrincipal principal) {
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.ok(testService.create(req, principal)));
+                .body(ApiResponse.ok(testService.create(req, principal)));
     }
 
     @PostMapping("/{testId}/{competenceId}/questions/{questionId}")
@@ -70,7 +75,7 @@ public class TestController {
             @AuthenticationPrincipal UserPrincipal principal) {
         testService.addQuestion(testId, competenceId, questionId, principal);
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.ok("Pregunta agregada al test"));
+                .body(ApiResponse.ok("Pregunta agregada al test"));
     }
 
     @DeleteMapping("/{testId}/{competenceId}/questions/{questionId}")

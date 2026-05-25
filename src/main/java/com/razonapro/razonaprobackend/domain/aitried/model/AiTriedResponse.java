@@ -30,9 +30,9 @@ public class AiTriedResponse {
     @JoinColumn(name = "competence_id")
     private Competence competence;
 
-    @Column(name = "question_text",  length = 300, nullable = false) private String questionText;
-    @Column(name = "student_answer", length = 200, nullable = false) private String studentAnswer;
-    @Column(name = "correct_answer", length = 200, nullable = false) private String correctAnswer;
+    @Column(name = "question_text",  length = 2000, nullable = false) private String questionText;
+    @Column(name = "student_answer", length = 300, nullable = false) private String studentAnswer;
+    @Column(name = "correct_answer", length = 300, nullable = false) private String correctAnswer;
 
     @Convert(converter = BooleanToYNConverter.class)
     @Column(name = "is_correct", columnDefinition = "CHAR(1)", nullable = false)

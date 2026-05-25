@@ -23,7 +23,7 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody UnifiedLoginRequest req) {
+    public ResponseEntity<ApiResponse<String>> login(@Valid @RequestBody UnifiedLoginRequest req) {
         return ResponseEntity.ok(ApiResponse.ok(authService.login(req)));
     }
 

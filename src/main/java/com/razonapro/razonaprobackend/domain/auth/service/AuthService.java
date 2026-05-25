@@ -5,7 +5,6 @@ import com.razonapro.razonaprobackend.domain.admin.model.Admin;
 import com.razonapro.razonaprobackend.domain.admin.repository.AdminRepository;
 import com.razonapro.razonaprobackend.domain.auth.dto.request.StudentRegisterRequest;
 import com.razonapro.razonaprobackend.domain.auth.dto.request.UnifiedLoginRequest;
-import com.razonapro.razonaprobackend.domain.auth.dto.response.AuthResponse;
 import com.razonapro.razonaprobackend.domain.program.repository.ProgramRepository;
 import com.razonapro.razonaprobackend.domain.student.dto.response.StudentDto;
 import com.razonapro.razonaprobackend.domain.student.model.Student;
@@ -51,19 +50,16 @@ public class AuthService {
     @Value("${jwt.password-reset-expiration-ms}")
     private long passwordResetExpirationMs;
 
-    // ── Login ─────────────────────────────────────────────────
-    @Transactional
-    public AuthResponse login(UnifiedLoginRequest req) {
+    public String login(UnifiedLoginRequest req) {
+        // misma lógica pero retornar solo el token string
         String code  = req.getCode().trim().toUpperCase();
         String email = req.getEmail().trim().toUpperCase();
-
         if (code.matches("^[A-Z]{3}[0-9]{3}$")) return handleAdminLogin(email, req.getPassword(), code);
         if (code.matches("^[0-9]{7}$"))           return handleStudentLogin(email, req.getPassword(), code);
-
         throw new ApiException("Código inválido", HttpStatus.UNAUTHORIZED);
     }
 
-    private AuthResponse handleAdminLogin(String email, String password, String code) {
+    private String handleAdminLogin(String email, String password, String code) {
         Admin admin = adminRepository.findByEmail(email)
                 .orElseThrow(() -> new ApiException("Credenciales incorrectas", HttpStatus.UNAUTHORIZED));
         if (!admin.getAdminId().equalsIgnoreCase(code))
@@ -74,12 +70,10 @@ public class AuthService {
             throw new ApiException("Credenciales incorrectas", HttpStatus.UNAUTHORIZED);
         admin.setLastLoginAt(LocalDateTime.now());
         adminRepository.save(admin);
-        return AuthResponse.builder()
-                .token(jwtService.generateAdminToken(admin.getAdminId(), admin.getEmail()))
-                .build();
+        return jwtService.generateAdminToken(admin.getAdminId(), admin.getEmail());
     }
 
-    private AuthResponse handleStudentLogin(String email, String password, String code) {
+    private String handleStudentLogin(String email, String password, String code) {
         Student student = studentRepository.findByStudentId(code)
                 .orElseThrow(() -> new ApiException("Credenciales incorrectas", HttpStatus.UNAUTHORIZED));
         if (!student.getEmail().equalsIgnoreCase(email))
@@ -92,9 +86,7 @@ public class AuthService {
             throw new ApiException("Credenciales incorrectas", HttpStatus.UNAUTHORIZED);
         student.setLastLoginAt(LocalDateTime.now());
         studentRepository.save(student);
-        return AuthResponse.builder()
-                .token(jwtService.generateStudentToken(student.getStudentId(), student.getProgramId(), student.getEmail()))
-                .build();
+        return jwtService.generateStudentToken(student.getStudentId(), student.getProgramId(), student.getEmail());
     }
 
     // ── Registro ──────────────────────────────────────────────

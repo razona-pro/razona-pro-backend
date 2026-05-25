@@ -43,16 +43,18 @@ public class TriedService {
     private final OptionRepository optionRepository;
     private final StudentRepository studentRepository;
 
+    @Transactional(readOnly = true)
     public PagedResponse<TriedDto> findMyTrieds(UserPrincipal principal, Pageable pageable) {
         Page<TriedDto> page = triedRepository
-            .findByStudentIdAndProgramId(principal.getId(), principal.getProgramId(), pageable)
-            .map(TriedDto::from);
+                .findByStudentIdAndProgramId(principal.getId(), principal.getProgramId(), pageable)
+                .map(TriedDto::from);
         return PagedResponse.from(page);
     }
 
+    @Transactional(readOnly = true)
     public TriedDto findById(String triedId, UserPrincipal principal) {
         Tried tried = triedRepository.findByTriedId(triedId)
-            .orElseThrow(() -> new ResourceNotFoundException("Intento", triedId));
+                .orElseThrow(() -> new ResourceNotFoundException("Intento", triedId));
         assertOwnership(tried, principal);
         return TriedDto.from(tried);
     }
