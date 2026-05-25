@@ -7,12 +7,17 @@ import lombok.Getter;
 import lombok.Setter;
 
 @Getter @Setter
-public class AdminForgotPasswordRequest {
+public class UnifiedForgotPasswordRequest {
 
     @NotBlank @Email
     private String email;
 
+    /** Código de admin (AMN001) o estudiante (0192250) */
     @NotBlank
-    @Pattern(regexp = "^[A-Z]{3}[0-9]{3}$", message = "Código de administrador inválido")
-    private String adminId;
+    private String code;
+
+    @NotBlank
+    @Pattern(regexp = "^\\+[1-9][0-9]{10,13}$",
+            message = "Formato internacional: +573001234567")
+    private String phone;
 }

@@ -1,8 +1,10 @@
 package com.razonapro.razonaprobackend.shared.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.razonapro.razonaprobackend.shared.exception.ErrorCode;
 import lombok.Builder;
 import lombok.Getter;
+
 import java.time.LocalDateTime;
 
 @Getter
@@ -11,9 +13,10 @@ import java.time.LocalDateTime;
 public class ApiResponse<T> {
 
     private boolean success;
-    private String message;
-    private T data;
-    private Object errors;
+    private String  code;
+    private String  message;
+    private T       data;
+    private Object  errors;
 
     @Builder.Default
     private LocalDateTime timestamp = LocalDateTime.now();
@@ -30,11 +33,18 @@ public class ApiResponse<T> {
         return ApiResponse.<T>builder().success(true).message(message).build();
     }
 
-    public static <T> ApiResponse<T> error(String message) {
-        return ApiResponse.<T>builder().success(false).message(message).build();
+    public static <T> ApiResponse<T> error(ErrorCode ec) {
+        return ApiResponse.<T>builder()
+                .success(false).code(ec.getCode()).message(ec.getDefaultMessage()).build();
     }
 
-    public static <T> ApiResponse<T> error(String message, Object errors) {
-        return ApiResponse.<T>builder().success(false).message(message).errors(errors).build();
+    public static <T> ApiResponse<T> error(ErrorCode ec, String message) {
+        return ApiResponse.<T>builder()
+                .success(false).code(ec.getCode()).message(message).build();
+    }
+
+    public static <T> ApiResponse<T> error(ErrorCode ec, String message, Object errors) {
+        return ApiResponse.<T>builder()
+                .success(false).code(ec.getCode()).message(message).errors(errors).build();
     }
 }

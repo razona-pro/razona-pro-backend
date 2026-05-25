@@ -1,14 +1,18 @@
 package com.razonapro.razonaprobackend.domain.ranking.model;
 
-import com.razonapro.razonaprobackend.infrastructure.util.BooleanToYNConverter;
+import com.razonapro.razonaprobackend.shared.jpa.Normalizable;
+import com.razonapro.razonaprobackend.shared.jpa.NormalizingEntityListener;
+import com.razonapro.razonaprobackend.shared.util.StringNormalizer;
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.time.LocalDateTime;
 
 @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
 @Entity
-@Table(name = "rankings", schema = "razonapro")
-public class Ranking {
+@Table(name = "rankings")
+@EntityListeners(NormalizingEntityListener.class)
+public class Ranking implements Normalizable {
 
     @Id
     @Column(name = "ranking_id", length = 6)
@@ -20,7 +24,7 @@ public class Ranking {
     @Column(name = "description", length = 100)
     private String description;
 
-    /** WEEKLY | MONTHLY | GENERAL */
+    /** DAILY | WEEKLY | MONTHLY | GENERAL */
     @Column(name = "period_type", length = 10, nullable = false)
     private String periodType;
 
@@ -28,7 +32,6 @@ public class Ranking {
     @Column(name = "source_filter", length = 10, nullable = false)
     private String sourceFilter;
 
-    @Convert(converter = BooleanToYNConverter.class)
     @Column(name = "is_active", columnDefinition = "CHAR(1)", nullable = false)
     @Builder.Default
     private Boolean isActive = true;
@@ -42,4 +45,11 @@ public class Ranking {
 
     @PreUpdate
     void onUpdate() { this.updatedAt = LocalDateTime.now(); }
+
+    @Override
+    public void normalize() {
+        rankingId   = StringNormalizer.upper(rankingId);
+        rankingName = StringNormalizer.upper(rankingName);
+        description = StringNormalizer.upper(description);
+    }
 }

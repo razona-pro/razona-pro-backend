@@ -18,15 +18,15 @@ public class TestDto {
 
     public static TestDto from(Test t) {
         return TestDto.builder()
-            .testId(t.getTestId())
-            .competenceId(t.getCompetenceId())
-            .competenceName(t.getCompetence() != null ? t.getCompetence().getCompetenceName() : null)
-            .testName(t.getTestName())
-            .description(t.getDescription())
-            .durationSeconds(t.getDurationSeconds())
-            .questionsToPresent(t.getQuestionsToPresent())
-            .testMode(t.getTestMode())
-            .isActive(t.getIsActive())
-            .build();
+                .testId(t.getTestId())
+                .competenceId(t.getCompetenceId())
+                .competenceName(t.getCompetence() != null ? t.getCompetence().getCompetenceName() : null)
+                .testName(t.getTestName())
+                .description(t.getDescription())
+                .durationSeconds(t.getDurationSeconds())
+                .questionsToPresent(t.getQuestionsToPresent())
+                .testMode(t.getTestMode())
+                .isActive(t.getIsActive())
+                .build();
     }
 }

@@ -3,10 +3,11 @@ package com.razonapro.razonaprobackend.domain.aitried.controller;
 import com.razonapro.razonaprobackend.domain.aitried.dto.request.StartAiTriedRequest;
 import com.razonapro.razonaprobackend.domain.aitried.dto.request.SubmitAiAnswerRequest;
 import com.razonapro.razonaprobackend.domain.aitried.dto.response.AiTriedDto;
+import com.razonapro.razonaprobackend.domain.aitried.service.AiTriedService;
+import com.razonapro.razonaprobackend.infrastructure.security.UserPrincipal;
 import com.razonapro.razonaprobackend.shared.dto.ApiResponse;
 import com.razonapro.razonaprobackend.shared.dto.PagedResponse;
-import com.razonapro.razonaprobackend.infrastructure.security.UserPrincipal;
-import com.razonapro.razonaprobackend.domain.aitried.service.AiTriedService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/ai-trieds")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('STUDENT')")
+@Tag(name = "AI Trieds", description = "Sesiones de práctica con IA")
 public class AiTriedController {
 
     private final AiTriedService aiTriedService;
@@ -28,16 +30,15 @@ public class AiTriedController {
     @GetMapping("/my")
     public ResponseEntity<ApiResponse<PagedResponse<AiTriedDto>>> findMy(
             @AuthenticationPrincipal UserPrincipal principal,
-            @RequestParam(defaultValue = "0")  int page,
+            @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        var pageable = PageRequest.of(page, size, Sort.by("attemptTimestamp").descending());
-        return ResponseEntity.ok(ApiResponse.ok(aiTriedService.findMy(principal, pageable)));
+        return ResponseEntity.ok(ApiResponse.ok(aiTriedService.findMy(principal,
+                PageRequest.of(page, size, Sort.by("attemptTimestamp").descending()))));
     }
 
     @GetMapping("/{aiTriedId}")
     public ResponseEntity<ApiResponse<AiTriedDto>> findById(
-            @PathVariable String aiTriedId,
-            @AuthenticationPrincipal UserPrincipal principal) {
+            @PathVariable String aiTriedId, @AuthenticationPrincipal UserPrincipal principal) {
         return ResponseEntity.ok(ApiResponse.ok(aiTriedService.findById(aiTriedId, principal)));
     }
 
@@ -46,7 +47,7 @@ public class AiTriedController {
             @Valid @RequestBody StartAiTriedRequest req,
             @AuthenticationPrincipal UserPrincipal principal) {
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.ok("Sesión AI iniciada", aiTriedService.start(req, principal)));
+                .body(ApiResponse.ok("Sesión AI iniciada", aiTriedService.start(req, principal)));
     }
 
     @PostMapping("/{aiTriedId}/answer")
@@ -63,6 +64,6 @@ public class AiTriedController {
             @RequestParam(required = false) Integer timeSpentSeconds,
             @AuthenticationPrincipal UserPrincipal principal) {
         return ResponseEntity.ok(ApiResponse.ok(
-            "Sesión AI finalizada", aiTriedService.finish(aiTriedId, timeSpentSeconds, principal)));
+                "Sesión AI finalizada", aiTriedService.finish(aiTriedId, timeSpentSeconds, principal)));
     }
 }

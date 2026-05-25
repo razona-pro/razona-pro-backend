@@ -3,11 +3,12 @@ package com.razonapro.razonaprobackend.domain.auth.model;
 import com.razonapro.razonaprobackend.domain.auth.model.enums.StudentTokenType;
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.time.LocalDateTime;
 
 @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
 @Entity
-@Table(name = "student_tokens", schema = "razonapro")
+@Table(name = "student_tokens")
 public class StudentToken {
 
     @Id
@@ -35,15 +36,7 @@ public class StudentToken {
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    public boolean isExpired() {
-        return LocalDateTime.now().isAfter(expiresAt);
-    }
-
-    public boolean isUsed() {
-        return usedAt != null;
-    }
-
-    public boolean isValid() {
-        return !isExpired() && !isUsed();
-    }
+    public boolean isExpired() { return LocalDateTime.now().isAfter(expiresAt); }
+    public boolean isUsed()    { return usedAt != null; }
+    public boolean isValid()   { return !isExpired() && !isUsed(); }
 }

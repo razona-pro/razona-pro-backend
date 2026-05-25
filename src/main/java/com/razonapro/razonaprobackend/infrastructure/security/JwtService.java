@@ -1,15 +1,16 @@
 package com.razonapro.razonaprobackend.infrastructure.security;
 
-import io.jsonwebtoken.*;
-import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
-import java.util.Map;
 
 @Slf4j
 @Service
@@ -21,58 +22,41 @@ public class JwtService {
     @Value("${jwt.expiration-ms}")
     private long expirationMs;
 
-    @Value("${jwt.email-verification-expiration-ms}")
-    private long emailVerifyExpirationMs;
-
     private SecretKey key() {
-        byte[] bytes = Decoders.BASE64.decode(java.util.Base64.getEncoder().encodeToString(secret.getBytes()));
-        return Keys.hmacShaKeyFor(bytes);
+        return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
-    /** Token de acceso para Admin */
     public String generateAdminToken(String adminId, String email) {
         return Jwts.builder()
-            .subject(adminId)
-            .claim("email", email)
-            .claim("userType", "ADMIN")
-            .claim("role", "ROLE_ADMIN")
-            .issuedAt(new Date())
-            .expiration(new Date(System.currentTimeMillis() + expirationMs))
-            .signWith(key())
-            .compact();
+                .subject(adminId)
+                .claim("email", email)
+                .claim("userType", "ADMIN")
+                .claim("role", "ROLE_ADMIN")
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + expirationMs))
+                .signWith(key())
+                .compact();
     }
 
-    /** Token de acceso para Student */
     public String generateStudentToken(String studentId, String programId, String email) {
         return Jwts.builder()
-            .subject(studentId)
-            .claim("email", email)
-            .claim("programId", programId)
-            .claim("userType", "STUDENT")
-            .claim("role", "ROLE_STUDENT")
-            .issuedAt(new Date())
-            .expiration(new Date(System.currentTimeMillis() + expirationMs))
-            .signWith(key())
-            .compact();
-    }
-
-    /** Token para verificación de email (firmado, sin rol) */
-    public String generateEmailVerificationToken(String studentId, String programId, String email) {
-        return Jwts.builder()
-            .subject(studentId)
-            .claims(Map.of("programId", programId, "email", email, "purpose", "EMAIL_VERIFY"))
-            .issuedAt(new Date())
-            .expiration(new Date(System.currentTimeMillis() + emailVerifyExpirationMs))
-            .signWith(key())
-            .compact();
+                .subject(studentId)
+                .claim("email", email)
+                .claim("programId", programId)
+                .claim("userType", "STUDENT")
+                .claim("role", "ROLE_STUDENT")
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + expirationMs))
+                .signWith(key())
+                .compact();
     }
 
     public Claims parseToken(String token) {
         return Jwts.parser()
-            .verifyWith(key())
-            .build()
-            .parseSignedClaims(token)
-            .getPayload();
+                .verifyWith(key())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
     }
 
     public boolean isValid(String token) {

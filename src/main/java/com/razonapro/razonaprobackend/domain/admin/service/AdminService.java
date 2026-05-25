@@ -3,14 +3,14 @@ package com.razonapro.razonaprobackend.domain.admin.service;
 import com.razonapro.razonaprobackend.domain.admin.dto.request.AdminCreateRequest;
 import com.razonapro.razonaprobackend.domain.admin.dto.request.AdminUpdateRequest;
 import com.razonapro.razonaprobackend.domain.admin.dto.response.AdminDto;
-import com.razonapro.razonaprobackend.shared.dto.PagedResponse;
-import com.razonapro.razonaprobackend.shared.exception.ApiException;
-import com.razonapro.razonaprobackend.shared.exception.ResourceNotFoundException;
 import com.razonapro.razonaprobackend.domain.admin.model.Admin;
 import com.razonapro.razonaprobackend.domain.admin.repository.AdminRepository;
 import com.razonapro.razonaprobackend.infrastructure.util.IdGenerator;
+import com.razonapro.razonaprobackend.shared.dto.PagedResponse;
+import com.razonapro.razonaprobackend.shared.exception.ApiException;
+import com.razonapro.razonaprobackend.shared.exception.ErrorCode;
+import com.razonapro.razonaprobackend.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -25,34 +25,29 @@ public class AdminService {
     private final PasswordEncoder passwordEncoder;
 
     public PagedResponse<AdminDto> findAll(Pageable pageable) {
-        Page<AdminDto> page = adminRepository.findAll(pageable).map(AdminDto::from);
-        return PagedResponse.from(page);
+        return PagedResponse.from(adminRepository.findAll(pageable).map(AdminDto::from));
     }
 
     public AdminDto findById(String id) {
         return AdminDto.from(adminRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Admin", id)));
+                .orElseThrow(() -> new ResourceNotFoundException("Admin", id)));
     }
 
     @Transactional
     public AdminDto create(AdminCreateRequest req) {
-        String email = req.getEmail().trim().toUpperCase();
-        String phone = req.getPhone().trim();
+        if (adminRepository.existsByEmail(req.getEmail().trim().toUpperCase()))
+            throw new ApiException(ErrorCode.EMAIL_ALREADY_EXISTS);
+        if (adminRepository.existsByPhone(req.getPhone().trim()))
+            throw new ApiException(ErrorCode.PHONE_ALREADY_EXISTS);
 
-        if (adminRepository.existsByEmail(email))
-            throw new ApiException("El email ya está en uso");
-        if (adminRepository.existsByPhone(phone))
-            throw new ApiException("El teléfono ya está en uso");
-
-        long count = adminRepository.count();
         Admin admin = Admin.builder()
-                .adminId(IdGenerator.adminId(count))
-                .firstName(req.getFirstName().trim().toUpperCase())
-                .secondName(req.getSecondName() != null ? req.getSecondName().trim().toUpperCase() : null)
-                .firstSurname(req.getFirstSurname().trim().toUpperCase())
-                .secondSurname(req.getSecondSurname() != null ? req.getSecondSurname().trim().toUpperCase() : null)
-                .email(email)
-                .phone(phone)
+                .adminId(IdGenerator.adminId(adminRepository.count()))
+                .firstName(req.getFirstName())
+                .secondName(req.getSecondName())
+                .firstSurname(req.getFirstSurname())
+                .secondSurname(req.getSecondSurname())
+                .email(req.getEmail())
+                .phone(req.getPhone())
                 .passwordHash(passwordEncoder.encode(req.getPassword()))
                 .build();
         return AdminDto.from(adminRepository.save(admin));
@@ -63,11 +58,11 @@ public class AdminService {
         Admin admin = adminRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Admin", id));
 
-        if (StringUtils.hasText(req.getFirstName()))     admin.setFirstName(req.getFirstName().trim().toUpperCase());
-        if (StringUtils.hasText(req.getSecondName()))    admin.setSecondName(req.getSecondName().trim().toUpperCase());
-        if (StringUtils.hasText(req.getFirstSurname()))  admin.setFirstSurname(req.getFirstSurname().trim().toUpperCase());
-        if (StringUtils.hasText(req.getSecondSurname())) admin.setSecondSurname(req.getSecondSurname().trim().toUpperCase());
-        if (StringUtils.hasText(req.getPhone()))         admin.setPhone(req.getPhone().trim());
+        if (StringUtils.hasText(req.getFirstName()))     admin.setFirstName(req.getFirstName());
+        if (StringUtils.hasText(req.getSecondName()))    admin.setSecondName(req.getSecondName());
+        if (StringUtils.hasText(req.getFirstSurname()))  admin.setFirstSurname(req.getFirstSurname());
+        if (StringUtils.hasText(req.getSecondSurname())) admin.setSecondSurname(req.getSecondSurname());
+        if (StringUtils.hasText(req.getPhone()))         admin.setPhone(req.getPhone());
         if (req.getIsActive() != null)                   admin.setIsActive(req.getIsActive());
 
         return AdminDto.from(adminRepository.save(admin));
@@ -76,7 +71,7 @@ public class AdminService {
     @Transactional
     public void deactivate(String id) {
         Admin admin = adminRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Admin", id));
+                .orElseThrow(() -> new ResourceNotFoundException("Admin", id));
         admin.setIsActive(false);
         adminRepository.save(admin);
     }

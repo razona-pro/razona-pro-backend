@@ -3,6 +3,7 @@ package com.razonapro.razonaprobackend.domain.tried.repository;
 import com.razonapro.razonaprobackend.domain.tried.model.StudentResponse;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
+
 import java.util.List;
 
 @Repository

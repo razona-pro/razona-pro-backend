@@ -1,21 +1,19 @@
 package com.razonapro.razonaprobackend.shared.exception;
 
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ResponseStatus;
+import lombok.Getter;
 
-@ResponseStatus(HttpStatus.BAD_REQUEST)
+@Getter
 public class ApiException extends RuntimeException {
-    private final HttpStatus status;
 
-    public ApiException(String message) {
-        super(message);
-        this.status = HttpStatus.BAD_REQUEST;
+    private final ErrorCode errorCode;
+
+    public ApiException(ErrorCode errorCode) {
+        super(errorCode.getDefaultMessage());
+        this.errorCode = errorCode;
     }
 
-    public ApiException(String message, HttpStatus status) {
-        super(message);
-        this.status = status;
+    public ApiException(ErrorCode errorCode, String customMessage) {
+        super(customMessage);
+        this.errorCode = errorCode;
     }
-
-    public HttpStatus getStatus() { return status; }
 }

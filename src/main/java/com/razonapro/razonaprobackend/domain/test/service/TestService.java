@@ -3,28 +3,30 @@ package com.razonapro.razonaprobackend.domain.test.service;
 import com.razonapro.razonaprobackend.domain.admin.repository.AdminRepository;
 import com.razonapro.razonaprobackend.domain.competence.repository.CompetenceRepository;
 import com.razonapro.razonaprobackend.domain.question.dto.response.OptionDto;
+import com.razonapro.razonaprobackend.domain.question.dto.response.QuestionDto;
 import com.razonapro.razonaprobackend.domain.question.repository.OptionRepository;
 import com.razonapro.razonaprobackend.domain.question.repository.QuestionRepository;
 import com.razonapro.razonaprobackend.domain.test.dto.request.TestRequest;
-import com.razonapro.razonaprobackend.domain.test.repository.TestQuestionRepository;
-import com.razonapro.razonaprobackend.domain.test.repository.TestRepository;
-import com.razonapro.razonaprobackend.shared.dto.PagedResponse;
-import com.razonapro.razonaprobackend.domain.question.dto.response.QuestionDto;
 import com.razonapro.razonaprobackend.domain.test.dto.response.TestDto;
-import com.razonapro.razonaprobackend.shared.exception.ApiException;
-import com.razonapro.razonaprobackend.shared.exception.ResourceNotFoundException;
 import com.razonapro.razonaprobackend.domain.test.model.Test;
 import com.razonapro.razonaprobackend.domain.test.model.TestQuestion;
-import com.razonapro.razonaprobackend.shared.ids.QuestionId;
-import com.razonapro.razonaprobackend.shared.ids.TestPK;
+import com.razonapro.razonaprobackend.domain.test.repository.TestQuestionRepository;
+import com.razonapro.razonaprobackend.domain.test.repository.TestRepository;
 import com.razonapro.razonaprobackend.infrastructure.security.UserPrincipal;
 import com.razonapro.razonaprobackend.infrastructure.util.IdGenerator;
+import com.razonapro.razonaprobackend.shared.dto.PagedResponse;
+import com.razonapro.razonaprobackend.shared.exception.ApiException;
+import com.razonapro.razonaprobackend.shared.exception.ErrorCode;
+import com.razonapro.razonaprobackend.shared.exception.ResourceNotFoundException;
+import com.razonapro.razonaprobackend.shared.ids.QuestionId;
+import com.razonapro.razonaprobackend.shared.ids.TestPK;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -64,7 +66,7 @@ public class TestService {
 
         List<TestQuestion> selected = tqs;
         if (test.getQuestionsToPresent() != null && test.getQuestionsToPresent() < tqs.size()) {
-            selected = new java.util.ArrayList<>(tqs);
+            selected = new ArrayList<>(tqs);
             Collections.shuffle(selected);
             selected = selected.subList(0, test.getQuestionsToPresent());
         }
@@ -74,13 +76,12 @@ public class TestService {
                     .orElseThrow();
             var opts = optionRepository.findByCompetenceIdAndQuestionId(tq.getCompetenceId(), tq.getQuestionId());
             if (showCorrect) return QuestionDto.from(q, opts);
-            var masked = opts.stream().map(OptionDto::fromMasked).toList();
             return QuestionDto.builder()
                     .competenceId(q.getCompetenceId())
                     .questionId(q.getQuestionId())
                     .statement(q.getStatement())
                     .difficultyLevel(q.getDifficultyLevel())
-                    .options(masked)
+                    .options(opts.stream().map(OptionDto::fromMasked).toList())
                     .build();
         }).toList();
     }
@@ -89,13 +90,14 @@ public class TestService {
     public TestDto create(TestRequest req, UserPrincipal principal) {
         competenceRepository.findById(req.getCompetenceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Competencia", req.getCompetenceId()));
-        long count = testRepository.count();
+
         Test test = Test.builder()
-                .testId(IdGenerator.testId(count))
+                .testId(IdGenerator.testId(testRepository.count()))
                 .competenceId(req.getCompetenceId())
-                .admin(adminRepository.findById(principal.getId()).orElseThrow())
-                .testName(req.getTestName().trim().toUpperCase())
-                .description(req.getDescription() != null ? req.getDescription().trim().toUpperCase() : null)
+                .admin(adminRepository.findById(principal.getId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Admin", principal.getId())))
+                .testName(req.getTestName())
+                .description(req.getDescription())
                 .durationSeconds(req.getDurationSeconds())
                 .questionsToPresent(req.getQuestionsToPresent())
                 .testMode(req.getTestMode())
@@ -109,17 +111,18 @@ public class TestService {
                 .orElseThrow(() -> new ResourceNotFoundException("Test", testId));
         questionRepository.findById(new QuestionId(competenceId, questionId))
                 .orElseThrow(() -> new ResourceNotFoundException("Pregunta", questionId));
+
         if (testQuestionRepository.existsByCompetenceIdAndTestIdAndQuestionId(competenceId, testId, questionId))
-            throw new ApiException("La pregunta ya está asignada a este test");
+            throw new ApiException(ErrorCode.DUPLICATE_RESOURCE, "La pregunta ya está asignada a este test");
+
         long order = testQuestionRepository.countByTestIdAndCompetenceId(testId, competenceId) + 1;
-        TestQuestion tq = TestQuestion.builder()
+        testQuestionRepository.save(TestQuestion.builder()
                 .admin(adminRepository.findById(principal.getId()).orElseThrow())
                 .competenceId(competenceId)
                 .testId(testId)
                 .questionId(questionId)
                 .questionOrder((int) order)
-                .build();
-        testQuestionRepository.save(tq);
+                .build());
     }
 
     @Transactional

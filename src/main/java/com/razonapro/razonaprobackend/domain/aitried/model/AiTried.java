@@ -4,12 +4,13 @@ import com.razonapro.razonaprobackend.domain.student.model.Student;
 import com.razonapro.razonaprobackend.shared.ids.AiTriedId;
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
 @Entity
-@Table(name = "ai_trieds", schema = "razonapro")
+@Table(name = "ai_trieds")
 @IdClass(AiTriedId.class)
 public class AiTried {
 
@@ -19,8 +20,8 @@ public class AiTried {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumns({
-        @JoinColumn(name = "student_id", referencedColumnName = "student_id", insertable = false, updatable = false),
-        @JoinColumn(name = "program_id", referencedColumnName = "program_id", insertable = false, updatable = false)
+            @JoinColumn(name = "student_id", referencedColumnName = "student_id", insertable = false, updatable = false),
+            @JoinColumn(name = "program_id", referencedColumnName = "program_id", insertable = false, updatable = false)
     })
     private Student student;
 
@@ -29,7 +30,7 @@ public class AiTried {
     @Builder.Default
     private String status = "IN_PROGRESS";
 
-    @Column(name = "score", precision = 7, scale = 2)
+    @Column(name = "score", precision = 5, scale = 2)
     private BigDecimal score;
 
     @Column(name = "total_questions", nullable = false)

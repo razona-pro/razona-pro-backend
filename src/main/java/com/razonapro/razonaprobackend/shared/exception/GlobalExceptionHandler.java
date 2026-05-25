@@ -18,46 +18,45 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(ApiException.class)
+    public ResponseEntity<ApiResponse<Void>> handleApi(ApiException ex) {
+        return ResponseEntity.status(ex.getErrorCode().getStatus())
+                .body(ApiResponse.error(ex.getErrorCode(), ex.getMessage()));
+    }
+
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleNotFound(ResourceNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
-            .body(ApiResponse.error(ex.getMessage()));
-    }
-
-    @ExceptionHandler(ApiException.class)
-    public ResponseEntity<ApiResponse<Void>> handleApiException(ApiException ex) {
-        return ResponseEntity.status(ex.getStatus())
-            .body(ApiResponse.error(ex.getMessage()));
+                .body(ApiResponse.error(ErrorCode.RESOURCE_NOT_FOUND, ex.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Void>> handleValidation(MethodArgumentNotValidException ex) {
         Map<String, String> errors = new HashMap<>();
-        ex.getBindingResult().getAllErrors().forEach(error -> {
-            String field   = ((FieldError) error).getField();
-            String message = error.getDefaultMessage();
-            errors.put(field, message);
+        ex.getBindingResult().getAllErrors().forEach(err -> {
+            String field = ((FieldError) err).getField();
+            errors.put(field, err.getDefaultMessage());
         });
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-            .body(ApiResponse.error("Errores de validación", errors));
+                .body(ApiResponse.error(ErrorCode.VALIDATION_FAILED, "Errores de validación", errors));
     }
 
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ApiResponse<Void>> handleBadCredentials(BadCredentialsException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-            .body(ApiResponse.error("Credenciales incorrectas"));
+                .body(ApiResponse.error(ErrorCode.INVALID_CREDENTIALS));
     }
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<Void>> handleAccessDenied(AccessDeniedException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
-            .body(ApiResponse.error("No tienes permisos para realizar esta acción"));
+                .body(ApiResponse.error(ErrorCode.INSUFFICIENT_PERMS));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGeneral(Exception ex) {
         log.error("Error no controlado: {}", ex.getMessage(), ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-            .body(ApiResponse.error("Error interno del servidor"));
+                .body(ApiResponse.error(ErrorCode.INTERNAL_ERROR));
     }
 }

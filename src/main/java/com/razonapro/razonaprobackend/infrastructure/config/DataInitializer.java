@@ -3,6 +3,7 @@ package com.razonapro.razonaprobackend.infrastructure.config;
 import com.razonapro.razonaprobackend.domain.admin.model.Admin;
 import com.razonapro.razonaprobackend.domain.admin.repository.AdminRepository;
 import com.razonapro.razonaprobackend.infrastructure.util.IdGenerator;
+import com.razonapro.razonaprobackend.shared.util.StringNormalizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -31,17 +32,18 @@ public class DataInitializer implements CommandLineRunner {
 
     private void initSuperAdmin() {
         AppProperties.AdminInitializer cfg = appProperties.getAdminInitializer();
-        if (adminRepository.existsByEmail(cfg.getEmail().trim().toUpperCase())) {
-            log.info("Super admin ya existe: {}", cfg.getEmail());
+        String email = StringNormalizer.upper(cfg.getEmail());
+        if (adminRepository.existsByEmail(email)) {
+            log.info("Super admin ya existe: {}", email);
             return;
         }
-        log.info("Creando super admin: {}", cfg.getEmail());
+        log.info("Creando super admin: {}", email);
         Admin admin = Admin.builder()
                 .adminId(IdGenerator.adminId(adminRepository.count()))
-                .firstName(cfg.getFirstName().trim().toUpperCase())
-                .firstSurname(cfg.getLastName().trim().toUpperCase())
-                .email(cfg.getEmail().trim().toUpperCase())
-                .phone(cfg.getPhone() != null ? cfg.getPhone().trim() : "+573000000000")
+                .firstName(StringNormalizer.upper(cfg.getFirstName()))
+                .firstSurname(StringNormalizer.upper(cfg.getLastName()))
+                .email(email)
+                .phone(StringNormalizer.trim(cfg.getPhone() != null ? cfg.getPhone() : "+573000000000"))
                 .passwordHash(passwordEncoder.encode(cfg.getPassword()))
                 .build();
         adminRepository.save(admin);

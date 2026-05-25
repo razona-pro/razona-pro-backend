@@ -13,10 +13,10 @@ public class CompetenceDto {
 
     public static CompetenceDto from(Competence c) {
         return CompetenceDto.builder()
-            .competenceId(c.getCompetenceId())
-            .competenceName(c.getCompetenceName())
-            .description(c.getDescription())
-            .isActive(c.getIsActive())
-            .build();
+                .competenceId(c.getCompetenceId())
+                .competenceName(c.getCompetenceName())
+                .description(c.getDescription())
+                .isActive(c.getIsActive())
+                .build();
     }
 }

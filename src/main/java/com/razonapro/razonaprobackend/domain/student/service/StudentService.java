@@ -1,10 +1,9 @@
-// domain/student/service/StudentService.java
 package com.razonapro.razonaprobackend.domain.student.service;
 
+import com.razonapro.razonaprobackend.domain.student.dto.request.StudentUpdateRequest;
 import com.razonapro.razonaprobackend.domain.student.dto.response.StudentDto;
 import com.razonapro.razonaprobackend.domain.student.model.Student;
 import com.razonapro.razonaprobackend.domain.student.repository.StudentRepository;
-import com.razonapro.razonaprobackend.domain.student.dto.request.StudentUpdateRequest;
 import com.razonapro.razonaprobackend.shared.dto.PagedResponse;
 import com.razonapro.razonaprobackend.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -30,22 +29,24 @@ public class StudentService {
 
     @Transactional
     public StudentDto update(String studentId, StudentUpdateRequest req) {
-        Student student = studentRepository.findByStudentId(studentId)
+        Student s = studentRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Estudiante", studentId));
-        if (StringUtils.hasText(req.getFirstName()))    student.setFirstName(req.getFirstName().trim().toUpperCase());
-        if (StringUtils.hasText(req.getSecondName()))   student.setSecondName(req.getSecondName().trim().toUpperCase());
-        if (StringUtils.hasText(req.getFirstSurname())) student.setFirstSurname(req.getFirstSurname().trim().toUpperCase());
-        if (StringUtils.hasText(req.getSecondSurname()))student.setSecondSurname(req.getSecondSurname().trim().toUpperCase());
-        if (StringUtils.hasText(req.getPhone()))        student.setPhone(req.getPhone().trim());
-        if (req.getIsActive() != null)                  student.setIsActive(req.getIsActive());
-        return StudentDto.from(studentRepository.save(student));
+
+        if (StringUtils.hasText(req.getFirstName()))     s.setFirstName(req.getFirstName());
+        if (StringUtils.hasText(req.getSecondName()))    s.setSecondName(req.getSecondName());
+        if (StringUtils.hasText(req.getFirstSurname()))  s.setFirstSurname(req.getFirstSurname());
+        if (StringUtils.hasText(req.getSecondSurname())) s.setSecondSurname(req.getSecondSurname());
+        if (StringUtils.hasText(req.getPhone()))         s.setPhone(req.getPhone());
+        if (req.getIsActive() != null)                   s.setIsActive(req.getIsActive());
+
+        return StudentDto.from(studentRepository.save(s));
     }
 
     @Transactional
     public void deactivate(String studentId) {
-        Student student = studentRepository.findByStudentId(studentId)
+        Student s = studentRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Estudiante", studentId));
-        student.setIsActive(false);
-        studentRepository.save(student);
+        s.setIsActive(false);
+        studentRepository.save(s);
     }
 }

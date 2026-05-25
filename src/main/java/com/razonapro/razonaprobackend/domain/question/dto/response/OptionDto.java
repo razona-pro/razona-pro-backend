@@ -10,22 +10,20 @@ import lombok.Getter;
 public class OptionDto {
     private String optionId;
     private String optionText;
-    /** Solo se expone al admin o cuando el intento ya terminó */
     private Boolean isCorrect;
 
     public static OptionDto from(Option o) {
         return OptionDto.builder()
-            .optionId(o.getOptionId())
-            .optionText(o.getOptionText())
-            .isCorrect(o.getIsCorrect())
-            .build();
+                .optionId(o.getOptionId())
+                .optionText(o.getOptionText())
+                .isCorrect(o.getIsCorrect())
+                .build();
     }
 
-    /** Versión sin revelar la respuesta correcta (durante el test) */
     public static OptionDto fromMasked(Option o) {
         return OptionDto.builder()
-            .optionId(o.getOptionId())
-            .optionText(o.getOptionText())
-            .build();
+                .optionId(o.getOptionId())
+                .optionText(o.getOptionText())
+                .build();
     }
 }

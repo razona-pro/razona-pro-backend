@@ -16,38 +16,38 @@ import java.util.List;
 public class UserPrincipal implements UserDetails {
 
     private String id;
-    private String programId;    // null para admins
+    private String programId;
     private String email;
     private String password;
-    private String userType;     // "ADMIN" | "STUDENT"
+    private String userType;
     private Collection<? extends GrantedAuthority> authorities;
 
     public static UserPrincipal fromAdmin(Admin admin) {
         return UserPrincipal.builder()
-            .id(admin.getAdminId())
-            .email(admin.getEmail())
-            .password(admin.getPasswordHash())
-            .userType("ADMIN")
-            .authorities(List.of(new SimpleGrantedAuthority("ROLE_ADMIN")))
-            .build();
+                .id(admin.getAdminId())
+                .email(admin.getEmail())
+                .password(admin.getPasswordHash())
+                .userType("ADMIN")
+                .authorities(List.of(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .build();
     }
 
     public static UserPrincipal fromStudent(Student student) {
         return UserPrincipal.builder()
-            .id(student.getStudentId())
-            .programId(student.getProgramId())
-            .email(student.getEmail())
-            .password(student.getPasswordHash())
-            .userType("STUDENT")
-            .authorities(List.of(new SimpleGrantedAuthority("ROLE_STUDENT")))
-            .build();
+                .id(student.getStudentId())
+                .programId(student.getProgramId())
+                .email(student.getEmail())
+                .password(student.getPasswordHash())
+                .userType("STUDENT")
+                .authorities(List.of(new SimpleGrantedAuthority("ROLE_STUDENT")))
+                .build();
     }
 
     @Override public Collection<? extends GrantedAuthority> getAuthorities() { return authorities; }
-    @Override public String getPassword()    { return password; }
-    @Override public String getUsername()    { return email; }
-    @Override public boolean isAccountNonExpired()     { return true; }
-    @Override public boolean isAccountNonLocked()      { return true; }
-    @Override public boolean isCredentialsNonExpired() { return true; }
-    @Override public boolean isEnabled()               { return true; }
+    @Override public String getPassword()                { return password; }
+    @Override public String getUsername()                { return email; }
+    @Override public boolean isAccountNonExpired()       { return true; }
+    @Override public boolean isAccountNonLocked()        { return true; }
+    @Override public boolean isCredentialsNonExpired()   { return true; }
+    @Override public boolean isEnabled()                 { return true; }
 }

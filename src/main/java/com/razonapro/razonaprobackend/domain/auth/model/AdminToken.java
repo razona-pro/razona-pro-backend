@@ -4,11 +4,12 @@ import com.razonapro.razonaprobackend.domain.admin.model.Admin;
 import com.razonapro.razonaprobackend.domain.auth.model.enums.AdminTokenType;
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.time.LocalDateTime;
 
 @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
 @Entity
-@Table(name = "admin_tokens", schema = "razonapro")
+@Table(name = "admin_tokens")
 public class AdminToken {
 
     @Id
@@ -40,15 +41,7 @@ public class AdminToken {
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    public boolean isExpired() {
-        return LocalDateTime.now().isAfter(expiresAt);
-    }
-
-    public boolean isUsed() {
-        return usedAt != null;
-    }
-
-    public boolean isValid() {
-        return !isExpired() && !isUsed();
-    }
+    public boolean isExpired() { return LocalDateTime.now().isAfter(expiresAt); }
+    public boolean isUsed()    { return usedAt != null; }
+    public boolean isValid()   { return !isExpired() && !isUsed(); }
 }

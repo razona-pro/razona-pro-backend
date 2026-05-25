@@ -1,16 +1,20 @@
 package com.razonapro.razonaprobackend.domain.student.model;
 
-import com.razonapro.razonaprobackend.infrastructure.util.BooleanToYNConverter;
 import com.razonapro.razonaprobackend.shared.ids.StudentId;
+import com.razonapro.razonaprobackend.shared.jpa.Normalizable;
+import com.razonapro.razonaprobackend.shared.jpa.NormalizingEntityListener;
+import com.razonapro.razonaprobackend.shared.util.StringNormalizer;
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "students", schema = "razonapro")
+@Table(name = "students")
 @IdClass(StudentId.class)
+@EntityListeners(NormalizingEntityListener.class)
 @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
-public class Student {
+public class Student implements Normalizable {
 
     @Id
     @Column(name = "student_id", length = 7, nullable = false)
@@ -38,20 +42,17 @@ public class Student {
     @Column(name = "phone", length = 15, nullable = false, unique = true)
     private String phone;
 
-    @Column(name = "password_hash", length = 72, nullable = false)
+    @Column(name = "password_hash", length = 60, nullable = false)
     private String passwordHash;
 
-    @Convert(converter = BooleanToYNConverter.class)
     @Column(name = "is_active", nullable = false, length = 1)
     @Builder.Default
     private Boolean isActive = true;
 
-    @Convert(converter = BooleanToYNConverter.class)
     @Column(name = "email_verified", nullable = false, length = 1)
     @Builder.Default
     private Boolean emailVerified = false;
 
-    @Convert(converter = BooleanToYNConverter.class)
     @Column(name = "identity_verified", nullable = false, length = 1)
     @Builder.Default
     private Boolean identityVerified = false;
@@ -66,26 +67,25 @@ public class Student {
     private LocalDateTime updatedAt;
 
     @PrePersist
-    private void onInsert() {
-        normalizeFields();
+    void onInsert() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
     }
 
     @PreUpdate
-    private void onUpdate() {
-        normalizeFields();
+    void onUpdate() {
         updatedAt = LocalDateTime.now();
     }
 
-    private void normalizeFields() {
-        if (studentId     != null) studentId     = studentId.trim().toUpperCase();
-        if (programId     != null) programId     = programId.trim();
-        if (firstName     != null) firstName     = firstName.trim().toUpperCase();
-        if (secondName    != null) secondName    = secondName.trim().toUpperCase();
-        if (firstSurname  != null) firstSurname  = firstSurname.trim().toUpperCase();
-        if (secondSurname != null) secondSurname = secondSurname.trim().toUpperCase();
-        if (email         != null) email         = email.trim().toUpperCase();
-        if (phone         != null) phone         = phone.trim();
+    @Override
+    public void normalize() {
+        studentId     = StringNormalizer.upper(studentId);
+        programId     = StringNormalizer.trim(programId);
+        firstName     = StringNormalizer.upper(firstName);
+        secondName    = StringNormalizer.upper(secondName);
+        firstSurname  = StringNormalizer.upper(firstSurname);
+        secondSurname = StringNormalizer.upper(secondSurname);
+        email         = StringNormalizer.upper(email);
+        phone         = StringNormalizer.trim(phone);
     }
 }

@@ -5,12 +5,13 @@ import com.razonapro.razonaprobackend.domain.test.model.Test;
 import com.razonapro.razonaprobackend.shared.ids.TriedId;
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
 @Entity
-@Table(name = "trieds", schema = "razonapro")
+@Table(name = "trieds")
 @IdClass(TriedId.class)
 public class Tried {
 
@@ -22,15 +23,15 @@ public class Tried {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumns({
-        @JoinColumn(name = "student_id",  referencedColumnName = "student_id",  insertable = false, updatable = false),
-        @JoinColumn(name = "program_id",  referencedColumnName = "program_id",  insertable = false, updatable = false)
+            @JoinColumn(name = "student_id", referencedColumnName = "student_id", insertable = false, updatable = false),
+            @JoinColumn(name = "program_id", referencedColumnName = "program_id", insertable = false, updatable = false)
     })
     private Student student;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumns({
-        @JoinColumn(name = "test_id",       referencedColumnName = "test_id",       insertable = false, updatable = false),
-        @JoinColumn(name = "competence_id", referencedColumnName = "competence_id", insertable = false, updatable = false)
+            @JoinColumn(name = "test_id",       referencedColumnName = "test_id",       insertable = false, updatable = false),
+            @JoinColumn(name = "competence_id", referencedColumnName = "competence_id", insertable = false, updatable = false)
     })
     private Test test;
 
@@ -39,7 +40,7 @@ public class Tried {
     @Builder.Default
     private String status = "IN_PROGRESS";
 
-    @Column(name = "score", precision = 7, scale = 2)
+    @Column(name = "score", precision = 5, scale = 2)
     private BigDecimal score;
 
     @Column(name = "time_spent_seconds")

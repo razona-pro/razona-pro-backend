@@ -4,8 +4,7 @@ import com.razonapro.razonaprobackend.domain.student.model.Student;
 import lombok.Builder;
 import lombok.Getter;
 
-@Getter
-@Builder
+@Getter @Builder
 public class StudentDto {
     private String studentId;
     private String programId;

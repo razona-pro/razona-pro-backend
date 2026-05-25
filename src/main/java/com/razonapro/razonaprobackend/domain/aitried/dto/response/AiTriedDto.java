@@ -3,6 +3,7 @@ package com.razonapro.razonaprobackend.domain.aitried.dto.response;
 import com.razonapro.razonaprobackend.domain.aitried.model.AiTried;
 import lombok.Builder;
 import lombok.Getter;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -20,15 +21,15 @@ public class AiTriedDto {
 
     public static AiTriedDto from(AiTried a) {
         return AiTriedDto.builder()
-            .aiTriedId(a.getAiTriedId())
-            .status(a.getStatus())
-            .score(a.getScore())
-            .totalQuestions(a.getTotalQuestions())
-            .correctAnswers(a.getCorrectAnswers())
-            .timeSpentSeconds(a.getTimeSpentSeconds())
-            .description(a.getDescription())
-            .attemptTimestamp(a.getAttemptTimestamp())
-            .finishedAt(a.getFinishedAt())
-            .build();
+                .aiTriedId(a.getAiTriedId())
+                .status(a.getStatus())
+                .score(a.getScore())
+                .totalQuestions(a.getTotalQuestions())
+                .correctAnswers(a.getCorrectAnswers())
+                .timeSpentSeconds(a.getTimeSpentSeconds())
+                .description(a.getDescription())
+                .attemptTimestamp(a.getAttemptTimestamp())
+                .finishedAt(a.getFinishedAt())
+                .build();
     }
 }

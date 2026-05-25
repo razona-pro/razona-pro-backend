@@ -4,6 +4,7 @@ import com.razonapro.razonaprobackend.domain.question.model.Option;
 import com.razonapro.razonaprobackend.domain.question.model.Question;
 import lombok.Builder;
 import lombok.Getter;
+
 import java.util.List;
 
 @Getter @Builder
@@ -19,27 +20,26 @@ public class QuestionDto {
 
     public static QuestionDto from(Question q) {
         return QuestionDto.builder()
-            .competenceId(q.getCompetenceId())
-            .questionId(q.getQuestionId())
-            .statement(q.getStatement())
-            .explanation(q.getExplanation())
-            .source(q.getSource())
-            .difficultyLevel(q.getDifficultyLevel())
-            .isActive(q.getIsActive())
-            .build();
+                .competenceId(q.getCompetenceId())
+                .questionId(q.getQuestionId())
+                .statement(q.getStatement())
+                .explanation(q.getExplanation())
+                .source(q.getSource())
+                .difficultyLevel(q.getDifficultyLevel())
+                .isActive(q.getIsActive())
+                .build();
     }
 
     public static QuestionDto from(Question q, List<Option> opts) {
-        QuestionDto dto = from(q);
         return QuestionDto.builder()
-            .competenceId(dto.competenceId)
-            .questionId(dto.questionId)
-            .statement(dto.statement)
-            .explanation(dto.explanation)
-            .source(dto.source)
-            .difficultyLevel(dto.difficultyLevel)
-            .isActive(dto.isActive)
-            .options(opts.stream().map(OptionDto::from).toList())
-            .build();
+                .competenceId(q.getCompetenceId())
+                .questionId(q.getQuestionId())
+                .statement(q.getStatement())
+                .explanation(q.getExplanation())
+                .source(q.getSource())
+                .difficultyLevel(q.getDifficultyLevel())
+                .isActive(q.getIsActive())
+                .options(opts.stream().map(OptionDto::from).toList())
+                .build();
     }
 }

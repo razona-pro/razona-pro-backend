@@ -1,14 +1,19 @@
 package com.razonapro.razonaprobackend;
 
+import com.razonapro.razonaprobackend.infrastructure.config.AiModelProperties;
 import com.razonapro.razonaprobackend.infrastructure.config.AppProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
-@EnableAsync          // para EmailService.send() asíncrono
-@EnableConfigurationProperties(AppProperties.class)
+@EnableAsync
+@EnableScheduling
+@EnableCaching
+@EnableConfigurationProperties({AppProperties.class, AiModelProperties.class})
 public class RazonaProBackendApplication {
 
     public static void main(String[] args) {

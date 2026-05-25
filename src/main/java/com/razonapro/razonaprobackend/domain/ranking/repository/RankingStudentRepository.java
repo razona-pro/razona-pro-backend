@@ -10,9 +10,15 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface RankingStudentRepository extends JpaRepository<RankingStudent, Integer> {
 
-    @Query(value = "SELECT rs FROM RankingStudent rs JOIN FETCH rs.student s WHERE rs.ranking.rankingId = :rankingId ORDER BY rs.totalScore DESC",
+    @Query(value = """
+        SELECT rs FROM RankingStudent rs
+        JOIN FETCH rs.student s
+        WHERE rs.ranking.rankingId = :rankingId
+        ORDER BY rs.totalScore DESC
+        """,
             countQuery = "SELECT COUNT(rs) FROM RankingStudent rs WHERE rs.ranking.rankingId = :rankingId")
     Page<RankingStudent> findLeaderboard(String rankingId, Pageable pageable);
+
     boolean existsByRankingRankingIdAndStudentIdAndProgramId(
-        String rankingId, String studentId, String programId);
+            String rankingId, String studentId, String programId);
 }

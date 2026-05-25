@@ -1,15 +1,18 @@
 package com.razonapro.razonaprobackend.domain.question.model;
 
 import com.razonapro.razonaprobackend.shared.ids.OptionId;
-import com.razonapro.razonaprobackend.infrastructure.util.BooleanToYNConverter;
+import com.razonapro.razonaprobackend.shared.jpa.Normalizable;
+import com.razonapro.razonaprobackend.shared.jpa.NormalizingEntityListener;
+import com.razonapro.razonaprobackend.shared.util.StringNormalizer;
 import jakarta.persistence.*;
 import lombok.*;
 
 @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
 @Entity
-@Table(name = "options", schema = "razonapro")
+@Table(name = "options")
 @IdClass(OptionId.class)
-public class Option {
+@EntityListeners(NormalizingEntityListener.class)
+public class Option implements Normalizable {
 
     @Id
     @Column(name = "competence_id", length = 6)
@@ -25,16 +28,20 @@ public class Option {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumns({
-        @JoinColumn(name = "competence_id", referencedColumnName = "competence_id", insertable = false, updatable = false),
-        @JoinColumn(name = "question_id",   referencedColumnName = "question_id",   insertable = false, updatable = false)
+            @JoinColumn(name = "competence_id", referencedColumnName = "competence_id", insertable = false, updatable = false),
+            @JoinColumn(name = "question_id",   referencedColumnName = "question_id",   insertable = false, updatable = false)
     })
     private Question question;
 
     @Column(name = "option_text", length = 300, nullable = false)
     private String optionText;
 
-    @Convert(converter = BooleanToYNConverter.class)
     @Column(name = "is_correct", columnDefinition = "CHAR(1)", nullable = false)
     @Builder.Default
     private Boolean isCorrect = false;
+
+    @Override
+    public void normalize() {
+        optionText = StringNormalizer.trim(optionText);
+    }
 }

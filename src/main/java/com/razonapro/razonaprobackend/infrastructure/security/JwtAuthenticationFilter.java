@@ -33,25 +33,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         if (StringUtils.hasText(token) && jwtService.isValid(token)) {
             try {
-                String userId   = jwtService.getSubject(token);
-                String role     = jwtService.getRole(token);
-                String userType = jwtService.getUserType(token);
+                String userId    = jwtService.getSubject(token);
+                String role      = jwtService.getRole(token);
+                String userType  = jwtService.getUserType(token);
                 String programId = jwtService.getProgramId(token);
 
                 UserPrincipal principal = UserPrincipal.builder()
-                    .id(userId)
-                    .programId(programId)
-                    .userType(userType)
-                    .authorities(List.of(new SimpleGrantedAuthority(role)))
-                    .build();
+                        .id(userId)
+                        .programId(programId)
+                        .userType(userType)
+                        .authorities(List.of(new SimpleGrantedAuthority(role)))
+                        .build();
 
                 UsernamePasswordAuthenticationToken auth =
-                    new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
+                        new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
                 auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(auth);
 
             } catch (Exception e) {
-                log.error("No se pudo establecer la autenticación: {}", e.getMessage());
+                log.error("Error estableciendo autenticación: {}", e.getMessage());
             }
         }
 
