@@ -1,5 +1,7 @@
 package com.razonapro.razonaprobackend.models;
 
+import com.razonapro.razonaprobackend.domain.ranking.model.Ranking;
+import com.razonapro.razonaprobackend.domain.student.model.Student;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;

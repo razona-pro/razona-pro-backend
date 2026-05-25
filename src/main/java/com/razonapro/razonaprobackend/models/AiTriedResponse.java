@@ -1,7 +1,8 @@
 package com.razonapro.razonaprobackend.models;
 
+import com.razonapro.razonaprobackend.domain.competence.model.Competence;
 import com.razonapro.razonaprobackend.models.ids.AiTriedResponseId;
-import com.razonapro.razonaprobackend.util.BooleanToYNConverter;
+import com.razonapro.razonaprobackend.infrastructure.util.BooleanToYNConverter;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;

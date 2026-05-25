@@ -1,5 +1,6 @@
 package com.razonapro.razonaprobackend.models;
 
+import com.razonapro.razonaprobackend.domain.student.model.Student;
 import com.razonapro.razonaprobackend.models.ids.AiTriedId;
 import jakarta.persistence.*;
 import lombok.*;

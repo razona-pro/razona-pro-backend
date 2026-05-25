@@ -1,6 +1,9 @@
 package com.razonapro.razonaprobackend.models;
 
-import com.razonapro.razonaprobackend.util.BooleanToYNConverter;
+import com.razonapro.razonaprobackend.domain.admin.model.Admin;
+import com.razonapro.razonaprobackend.domain.question.model.Question;
+import com.razonapro.razonaprobackend.domain.test.model.Test;
+import com.razonapro.razonaprobackend.infrastructure.util.BooleanToYNConverter;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;

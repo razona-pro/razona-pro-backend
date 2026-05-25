@@ -1,6 +1,6 @@
 package com.razonapro.razonaprobackend.services;
 
-import com.razonapro.razonaprobackend.config.AppProperties;
+import com.razonapro.razonaprobackend.infrastructure.config.AppProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.mail.javamail.JavaMailSender;
