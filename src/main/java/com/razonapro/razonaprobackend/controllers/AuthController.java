@@ -1,6 +1,6 @@
 package com.razonapro.razonaprobackend.controllers;
 
-import com.razonapro.razonaprobackend.dtos.request.LoginRequest;
+import com.razonapro.razonaprobackend.dtos.request.UnifiedLoginRequest;
 import com.razonapro.razonaprobackend.dtos.request.StudentRegisterRequest;
 import com.razonapro.razonaprobackend.dtos.response.ApiResponse;
 import com.razonapro.razonaprobackend.dtos.response.AuthResponse;
@@ -19,16 +19,10 @@ public class AuthController {
 
     private final AuthService authService;
 
-    /** POST /api/auth/admin/login */
-    @PostMapping("/admin/login")
-    public ResponseEntity<ApiResponse<AuthResponse>> adminLogin(@Valid @RequestBody LoginRequest req) {
-        return ResponseEntity.ok(ApiResponse.ok(authService.adminLogin(req)));
-    }
-
-    /** POST /api/auth/student/login */
-    @PostMapping("/student/login")
-    public ResponseEntity<ApiResponse<AuthResponse>> studentLogin(@Valid @RequestBody LoginRequest req) {
-        return ResponseEntity.ok(ApiResponse.ok(authService.studentLogin(req)));
+    /** POST /api/auth/login — unificado admin y estudiante */
+    @PostMapping("/login")
+    public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody UnifiedLoginRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok(authService.login(req)));
     }
 
     /** POST /api/auth/student/register */
@@ -36,7 +30,7 @@ public class AuthController {
     public ResponseEntity<ApiResponse<StudentDto>> register(@Valid @RequestBody StudentRegisterRequest req) {
         StudentDto dto = authService.registerStudent(req);
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.ok("Registro exitoso. Revisa tu correo para verificar tu cuenta.", dto));
+                .body(ApiResponse.ok("Registro exitoso. Revisa tu correo para verificar tu cuenta.", dto));
     }
 
     /** GET /api/auth/verify-email?token=xxx */
