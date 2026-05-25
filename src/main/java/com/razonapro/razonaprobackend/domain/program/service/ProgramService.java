@@ -36,8 +36,8 @@ public class ProgramService {
             throw new ApiException("Ya existe un programa con el ID: " + req.getProgramId());
         Program p = Program.builder()
             .programId(req.getProgramId().toUpperCase())
-            .programName(req.getProgramName())
-            .description(req.getDescription())
+                .programName(req.getProgramName().trim().toUpperCase())
+                .description(req.getDescription() != null ? req.getDescription().trim().toUpperCase() : null)
             .build();
         return ProgramDto.from(programRepository.save(p));
     }

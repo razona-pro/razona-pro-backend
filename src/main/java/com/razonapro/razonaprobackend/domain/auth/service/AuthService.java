@@ -5,6 +5,7 @@ import com.razonapro.razonaprobackend.domain.admin.model.Admin;
 import com.razonapro.razonaprobackend.domain.admin.repository.AdminRepository;
 import com.razonapro.razonaprobackend.domain.auth.dto.request.StudentRegisterRequest;
 import com.razonapro.razonaprobackend.domain.auth.dto.request.UnifiedLoginRequest;
+import com.razonapro.razonaprobackend.domain.auth.dto.response.AuthResponse;
 import com.razonapro.razonaprobackend.domain.program.repository.ProgramRepository;
 import com.razonapro.razonaprobackend.domain.student.dto.response.StudentDto;
 import com.razonapro.razonaprobackend.domain.student.model.Student;
@@ -50,12 +51,12 @@ public class AuthService {
     @Value("${jwt.password-reset-expiration-ms}")
     private long passwordResetExpirationMs;
 
-    public String login(UnifiedLoginRequest req) {
-        // misma lógica pero retornar solo el token string
+    @Transactional
+    public AuthResponse login(UnifiedLoginRequest req) {
         String code  = req.getCode().trim().toUpperCase();
         String email = req.getEmail().trim().toUpperCase();
-        if (code.matches("^[A-Z]{3}[0-9]{3}$")) return handleAdminLogin(email, req.getPassword(), code);
-        if (code.matches("^[0-9]{7}$"))           return handleStudentLogin(email, req.getPassword(), code);
+        if (code.matches("^[A-Z]{3}[0-9]{3}$")) return AuthResponse.builder().token(handleAdminLogin(email, req.getPassword(), code)).build();
+        if (code.matches("^[0-9]{7}$"))           return AuthResponse.builder().token(handleStudentLogin(email, req.getPassword(), code)).build();
         throw new ApiException("Código inválido", HttpStatus.UNAUTHORIZED);
     }
 

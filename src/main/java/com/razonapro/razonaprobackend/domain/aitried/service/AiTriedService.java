@@ -71,8 +71,8 @@ public class AiTriedService {
         if (!"IN_PROGRESS".equals(aiTried.getStatus()))
             throw new ApiException("El intento AI no está en progreso");
 
-        competenceRepository.findById(req.getCompetenceId())
-            .orElseThrow(() -> new ResourceNotFoundException("Competencia", req.getCompetenceId()));
+        var competence = competenceRepository.findById(req.getCompetenceId())
+                .orElseThrow(() -> new ResourceNotFoundException("Competencia", req.getCompetenceId()));
 
         AiTriedResponse response = AiTriedResponse.builder()
             .programId(aiTried.getProgramId())
@@ -86,7 +86,7 @@ public class AiTriedService {
             .answeredAt(LocalDateTime.now())
             .build();
         // Asociar competencia
-        response.setCompetence(competenceRepository.findById(req.getCompetenceId()).orElseThrow());
+        response.setCompetence(competence);
         aiTriedResponseRepository.save(response);
 
         // Actualizar contadores

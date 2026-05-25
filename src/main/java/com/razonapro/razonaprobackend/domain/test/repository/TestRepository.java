@@ -11,9 +11,11 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface TestRepository extends JpaRepository<Test, TestPK> {
 
-    @Query("SELECT t FROM Test t JOIN FETCH t.competence WHERE t.isActive = true")
+    @Query(value = "SELECT t FROM Test t JOIN FETCH t.competence WHERE t.isActive = true",
+            countQuery = "SELECT COUNT(t) FROM Test t WHERE t.isActive = true")
     Page<Test> findAllActiveWithCompetence(Pageable pageable);
 
-    @Query("SELECT t FROM Test t JOIN FETCH t.competence")
+    @Query(value = "SELECT t FROM Test t JOIN FETCH t.competence",
+            countQuery = "SELECT COUNT(t) FROM Test t")
     Page<Test> findAllWithCompetence(Pageable pageable);
 }

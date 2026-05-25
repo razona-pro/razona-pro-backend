@@ -44,12 +44,12 @@ public class RankingService {
     public RankingDto create(RankingRequest req) {
         long count = rankingRepository.count();
         Ranking ranking = Ranking.builder()
-            .rankingId(IdGenerator.rankingId(count))
-            .rankingName(req.getRankingName())
-            .description(req.getDescription())
-            .periodType(req.getPeriodType())
-            .sourceFilter(req.getSourceFilter())
-            .build();
+                .rankingId(IdGenerator.rankingId(count))
+                .rankingName(req.getRankingName().trim().toUpperCase())
+                .description(req.getDescription() != null ? req.getDescription().trim().toUpperCase() : null)
+                .periodType(req.getPeriodType())
+                .sourceFilter(req.getSourceFilter())
+                .build();
         return RankingDto.from(rankingRepository.save(ranking));
     }
 

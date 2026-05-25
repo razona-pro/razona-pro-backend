@@ -34,10 +34,10 @@ public class CompetenceService {
     public CompetenceDto create(CompetenceRequest req) {
         long count = competenceRepository.count();
         Competence c = Competence.builder()
-            .competenceId(IdGenerator.competenceId(count))
-            .competenceName(req.getCompetenceName())
-            .description(req.getDescription())
-            .build();
+                .competenceId(IdGenerator.competenceId(count))
+                .competenceName(req.getCompetenceName().trim().toUpperCase())
+                .description(req.getDescription() != null ? req.getDescription().trim().toUpperCase() : null)
+                .build();
         return CompetenceDto.from(competenceRepository.save(c));
     }
 
@@ -45,8 +45,8 @@ public class CompetenceService {
     public CompetenceDto update(String id, CompetenceRequest req) {
         Competence c = competenceRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Competencia", id));
-        c.setCompetenceName(req.getCompetenceName());
-        c.setDescription(req.getDescription());
+        c.setCompetenceName(req.getCompetenceName().trim().toUpperCase());
+        c.setDescription(req.getDescription() != null ? req.getDescription().trim().toUpperCase() : null);
         return CompetenceDto.from(competenceRepository.save(c));
     }
 
