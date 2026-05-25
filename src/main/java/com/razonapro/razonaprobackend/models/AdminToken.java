@@ -1,5 +1,6 @@
 package com.razonapro.razonaprobackend.models;
 
+import com.razonapro.razonaprobackend.domain.admin.model.Admin;
 import com.razonapro.razonaprobackend.models.enums.AdminTokenType;
 import jakarta.persistence.*;
 import lombok.*;

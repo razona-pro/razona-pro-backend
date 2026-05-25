@@ -18,10 +18,6 @@ public class StudentToken {
     @Column(name = "student_id", length = 7, nullable = false)
     private String studentId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "student_id", insertable = false, updatable = false)
-    private Student student;
-
     @Column(name = "token_hash", length = 64, nullable = false, unique = true)
     private String tokenHash;
 

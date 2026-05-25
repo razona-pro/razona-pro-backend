@@ -1,12 +1,14 @@
 package com.razonapro.razonaprobackend.domain.student.model;
 
 import com.razonapro.razonaprobackend.infrastructure.util.BooleanToYNConverter;
+import com.razonapro.razonaprobackend.models.ids.StudentId;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "students", schema = "razonapro")
+@IdClass(StudentId.class)
 @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
 public class Student {
 
@@ -14,6 +16,7 @@ public class Student {
     @Column(name = "student_id", length = 7, nullable = false)
     private String studentId;
 
+    @Id
     @Column(name = "program_id", length = 3, nullable = false)
     private String programId;
 
