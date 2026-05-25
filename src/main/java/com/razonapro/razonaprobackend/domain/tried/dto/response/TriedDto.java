@@ -3,6 +3,7 @@ package com.razonapro.razonaprobackend.domain.tried.dto.response;
 import com.razonapro.razonaprobackend.domain.tried.model.Tried;
 import lombok.Builder;
 import lombok.Getter;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -22,17 +23,17 @@ public class TriedDto {
 
     public static TriedDto from(Tried t) {
         return TriedDto.builder()
-            .triedId(t.getTriedId())
-            .testId(t.getTestId())
-            .testName(t.getTest() != null ? t.getTest().getTestName() : null)
-            .competenceId(t.getCompetenceId())
-            .status(t.getStatus())
-            .score(t.getScore())
-            .totalQuestions(t.getTotalQuestions())
-            .correctAnswers(t.getCorrectAnswers())
-            .timeSpentSeconds(t.getTimeSpentSeconds())
-            .attemptTimestamp(t.getAttemptTimestamp())
-            .finishedAt(t.getFinishedAt())
-            .build();
+                .triedId(t.getTriedId())
+                .testId(t.getTestId())
+                .testName(t.getTest() != null ? t.getTest().getTestName() : null)
+                .competenceId(t.getCompetenceId())
+                .status(t.getStatus())
+                .score(t.getScore())
+                .totalQuestions(t.getTotalQuestions())
+                .correctAnswers(t.getCorrectAnswers())
+                .timeSpentSeconds(t.getTimeSpentSeconds())
+                .attemptTimestamp(t.getAttemptTimestamp())
+                .finishedAt(t.getFinishedAt())
+                .build();
     }
 }

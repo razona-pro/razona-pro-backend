@@ -15,12 +15,12 @@ public class RankingDto {
 
     public static RankingDto from(Ranking r) {
         return RankingDto.builder()
-            .rankingId(r.getRankingId())
-            .rankingName(r.getRankingName())
-            .description(r.getDescription())
-            .periodType(r.getPeriodType())
-            .sourceFilter(r.getSourceFilter())
-            .isActive(r.getIsActive())
-            .build();
+                .rankingId(r.getRankingId())
+                .rankingName(r.getRankingName())
+                .description(r.getDescription())
+                .periodType(r.getPeriodType())
+                .sourceFilter(r.getSourceFilter())
+                .isActive(r.getIsActive())
+                .build();
     }
 }

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.razonapro.razonaprobackend.domain.admin.model.Admin;
 import lombok.Builder;
 import lombok.Getter;
+
 import java.time.LocalDateTime;
 
 @Getter @Builder
@@ -22,16 +23,16 @@ public class AdminDto {
 
     public static AdminDto from(Admin a) {
         return AdminDto.builder()
-            .adminId(a.getAdminId())
-            .firstName(a.getFirstName())
-            .secondName(a.getSecondName())
-            .firstSurname(a.getFirstSurname())
-            .secondSurname(a.getSecondSurname())
-            .email(a.getEmail())
-            .phone(a.getPhone())
-            .isActive(a.getIsActive())
-            .lastLoginAt(a.getLastLoginAt())
-            .createdAt(a.getCreatedAt())
-            .build();
+                .adminId(a.getAdminId())
+                .firstName(a.getFirstName())
+                .secondName(a.getSecondName())
+                .firstSurname(a.getFirstSurname())
+                .secondSurname(a.getSecondSurname())
+                .email(a.getEmail())
+                .phone(a.getPhone())
+                .isActive(a.getIsActive())
+                .lastLoginAt(a.getLastLoginAt())
+                .createdAt(a.getCreatedAt())
+                .build();
     }
 }

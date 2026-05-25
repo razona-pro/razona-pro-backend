@@ -7,13 +7,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
+
 import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface TriedRepository extends JpaRepository<Tried, TriedId> {
-
-    List<Tried> findByStudentIdAndProgramIdOrderByAttemptTimestampDesc(String studentId, String programId);
 
     Page<Tried> findByStudentIdAndProgramId(String studentId, String programId, Pageable pageable);
 
@@ -22,5 +21,14 @@ public interface TriedRepository extends JpaRepository<Tried, TriedId> {
     @Query("SELECT t FROM Tried t WHERE t.studentId = :studentId AND t.programId = :programId AND t.status = 'IN_PROGRESS'")
     List<Tried> findInProgressByStudent(String studentId, String programId);
 
-    boolean existsByTriedId(String triedId);
+    long countByStatus(String status);
+
+    @Query("""
+        SELECT COALESCE(
+          (SUM(CASE WHEN t.score >= 60 THEN 1.0 ELSE 0.0 END) / COUNT(t)) * 100,
+          0
+        )
+        FROM Tried t WHERE t.status = 'FINISHED'
+    """)
+    double satisfactionPercentage();
 }

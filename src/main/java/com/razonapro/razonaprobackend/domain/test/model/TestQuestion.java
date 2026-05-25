@@ -2,22 +2,21 @@ package com.razonapro.razonaprobackend.domain.test.model;
 
 import com.razonapro.razonaprobackend.domain.admin.model.Admin;
 import com.razonapro.razonaprobackend.domain.question.model.Question;
-import com.razonapro.razonaprobackend.infrastructure.util.BooleanToYNConverter;
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.time.LocalDateTime;
 
 @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
 @Entity
-@Table(name = "tests_questions", schema = "razonapro")
+@Table(name = "tests_questions")
 public class TestQuestion {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE,
-                    generator = "seq_test_question")
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "seq_test_question")
     @SequenceGenerator(name = "seq_test_question",
-                       sequenceName = "razonapro.seq_test_question_id",
-                       allocationSize = 1)
+            sequenceName = "seq_test_question_id",
+            allocationSize = 1)
     @Column(name = "test_question_id")
     private Integer testQuestionId;
 
@@ -33,8 +32,8 @@ public class TestQuestion {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumns({
-        @JoinColumn(name = "test_id",       referencedColumnName = "test_id",       insertable = false, updatable = false),
-        @JoinColumn(name = "competence_id", referencedColumnName = "competence_id", insertable = false, updatable = false)
+            @JoinColumn(name = "test_id",       referencedColumnName = "test_id",       insertable = false, updatable = false),
+            @JoinColumn(name = "competence_id", referencedColumnName = "competence_id", insertable = false, updatable = false)
     })
     private Test test;
 
@@ -43,15 +42,14 @@ public class TestQuestion {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumns({
-        @JoinColumn(name = "competence_id", referencedColumnName = "competence_id", insertable = false, updatable = false),
-        @JoinColumn(name = "question_id",   referencedColumnName = "question_id",   insertable = false, updatable = false)
+            @JoinColumn(name = "competence_id", referencedColumnName = "competence_id", insertable = false, updatable = false),
+            @JoinColumn(name = "question_id",   referencedColumnName = "question_id",   insertable = false, updatable = false)
     })
     private Question question;
 
     @Column(name = "question_order")
     private Integer questionOrder;
 
-    @Convert(converter = BooleanToYNConverter.class)
     @Column(name = "is_active", columnDefinition = "CHAR(1)", nullable = false)
     @Builder.Default
     private Boolean isActive = true;

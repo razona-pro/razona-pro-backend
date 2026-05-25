@@ -1,16 +1,9 @@
 package com.razonapro.razonaprobackend.shared.ids;
 
-import lombok.AllArgsConstructor;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-
+import lombok.*;
 import java.io.Serializable;
 
-@Getter @Setter
-@NoArgsConstructor @AllArgsConstructor
-@EqualsAndHashCode
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @EqualsAndHashCode
 public class StudentId implements Serializable {
     private String studentId;
     private String programId;

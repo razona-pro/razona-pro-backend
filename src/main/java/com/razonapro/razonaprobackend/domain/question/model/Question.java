@@ -3,16 +3,20 @@ package com.razonapro.razonaprobackend.domain.question.model;
 import com.razonapro.razonaprobackend.domain.admin.model.Admin;
 import com.razonapro.razonaprobackend.domain.competence.model.Competence;
 import com.razonapro.razonaprobackend.shared.ids.QuestionId;
-import com.razonapro.razonaprobackend.infrastructure.util.BooleanToYNConverter;
+import com.razonapro.razonaprobackend.shared.jpa.Normalizable;
+import com.razonapro.razonaprobackend.shared.jpa.NormalizingEntityListener;
+import com.razonapro.razonaprobackend.shared.util.StringNormalizer;
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.time.LocalDateTime;
 
 @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
 @Entity
-@Table(name = "questions", schema = "razonapro")
+@Table(name = "questions")
 @IdClass(QuestionId.class)
-public class Question {
+@EntityListeners(NormalizingEntityListener.class)
+public class Question implements Normalizable {
 
     @Id
     @Column(name = "competence_id", length = 6)
@@ -39,12 +43,10 @@ public class Question {
     @Column(name = "source", length = 50)
     private String source;
 
-    /** B=Básico, M=Medio, A=Alto */
     @Column(name = "difficulty_level", columnDefinition = "CHAR(1)", nullable = false)
     @Builder.Default
     private String difficultyLevel = "M";
 
-    @Convert(converter = BooleanToYNConverter.class)
     @Column(name = "is_active", columnDefinition = "CHAR(1)", nullable = false)
     @Builder.Default
     private Boolean isActive = true;
@@ -58,4 +60,11 @@ public class Question {
 
     @PreUpdate
     void onUpdate() { this.updatedAt = LocalDateTime.now(); }
+
+    @Override
+    public void normalize() {
+        statement   = StringNormalizer.trim(statement);
+        explanation = StringNormalizer.trim(explanation);
+        source      = StringNormalizer.upper(source);
+    }
 }

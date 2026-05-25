@@ -13,10 +13,10 @@ public class ProgramDto {
 
     public static ProgramDto from(Program p) {
         return ProgramDto.builder()
-            .programId(p.getProgramId())
-            .programName(p.getProgramName())
-            .description(p.getDescription())
-            .isActive(p.getIsActive())
-            .build();
+                .programId(p.getProgramId())
+                .programName(p.getProgramName())
+                .description(p.getDescription())
+                .isActive(p.getIsActive())
+                .build();
     }
 }

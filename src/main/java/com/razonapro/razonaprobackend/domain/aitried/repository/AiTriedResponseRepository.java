@@ -4,6 +4,7 @@ import com.razonapro.razonaprobackend.domain.aitried.model.AiTriedResponse;
 import com.razonapro.razonaprobackend.shared.ids.AiTriedResponseId;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
+
 import java.util.List;
 
 @Repository

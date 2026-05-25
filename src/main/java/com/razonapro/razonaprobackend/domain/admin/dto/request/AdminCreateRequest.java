@@ -16,11 +16,13 @@ public class AdminCreateRequest {
     private String email;
 
     @NotBlank @Size(max = 15)
+    @Pattern(regexp = "^\\+[1-9][0-9]{10,13}$",
+            message = "Formato internacional: +573001234567")
     private String phone;
 
     @NotBlank
     @Size(min = 8, max = 64)
     @Pattern(regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).+$",
-             message = "La contraseña debe tener mayúscula, minúscula y número")
+            message = "La contraseña debe tener mayúscula, minúscula y número")
     private String password;
 }

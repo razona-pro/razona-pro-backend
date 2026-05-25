@@ -1,25 +1,27 @@
 package com.razonapro.razonaprobackend.domain.program.controller;
 
 import com.razonapro.razonaprobackend.domain.program.dto.request.ProgramRequest;
-import com.razonapro.razonaprobackend.shared.dto.ApiResponse;
 import com.razonapro.razonaprobackend.domain.program.dto.response.ProgramDto;
 import com.razonapro.razonaprobackend.domain.program.service.ProgramService;
+import com.razonapro.razonaprobackend.shared.dto.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/programs")
 @RequiredArgsConstructor
+@Tag(name = "Programs", description = "Gestión de programas académicos")
 public class ProgramController {
 
     private final ProgramService programService;
 
-    /** Cualquiera puede ver los programas activos (para el registro) */
     @GetMapping("/active")
     public ResponseEntity<ApiResponse<List<ProgramDto>>> findAllActive() {
         return ResponseEntity.ok(ApiResponse.ok(programService.findAllActive()));

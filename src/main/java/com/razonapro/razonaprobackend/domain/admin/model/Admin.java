@@ -1,14 +1,18 @@
 package com.razonapro.razonaprobackend.domain.admin.model;
 
-import com.razonapro.razonaprobackend.infrastructure.util.BooleanToYNConverter;
+import com.razonapro.razonaprobackend.shared.jpa.Normalizable;
+import com.razonapro.razonaprobackend.shared.jpa.NormalizingEntityListener;
+import com.razonapro.razonaprobackend.shared.util.StringNormalizer;
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.time.LocalDateTime;
 
 @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
 @Entity
-@Table(name = "admins", schema = "razonapro")
-public class Admin {
+@Table(name = "admins")
+@EntityListeners(NormalizingEntityListener.class)
+public class Admin implements Normalizable {
 
     @Id
     @Column(name = "admin_id", length = 6)
@@ -32,10 +36,9 @@ public class Admin {
     @Column(name = "phone", length = 15, nullable = false, unique = true)
     private String phone;
 
-    @Column(name = "password_hash", length = 72, nullable = false)
+    @Column(name = "password_hash", length = 60, nullable = false)
     private String passwordHash;
 
-    @Convert(converter = BooleanToYNConverter.class)
     @Column(name = "is_active", columnDefinition = "CHAR(1)", nullable = false)
     @Builder.Default
     private Boolean isActive = true;
@@ -50,25 +53,24 @@ public class Admin {
     private LocalDateTime updatedAt;
 
     @PrePersist
-    private void onInsert() {
-        normalizeFields();
+    void onInsert() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
     }
 
     @PreUpdate
-    private void onUpdate() {
-        normalizeFields();
+    void onUpdate() {
         updatedAt = LocalDateTime.now();
     }
 
-    private void normalizeFields() {
-        if (adminId      != null) adminId      = adminId.trim().toUpperCase();
-        if (firstName    != null) firstName    = firstName.trim().toUpperCase();
-        if (secondName   != null) secondName   = secondName.trim().toUpperCase();
-        if (firstSurname != null) firstSurname = firstSurname.trim().toUpperCase();
-        if (secondSurname != null) secondSurname = secondSurname.trim().toUpperCase();
-        if (email        != null) email        = email.trim().toUpperCase();
-        if (phone        != null) phone        = phone.trim();
+    @Override
+    public void normalize() {
+        adminId       = StringNormalizer.upper(adminId);
+        firstName     = StringNormalizer.upper(firstName);
+        secondName    = StringNormalizer.upper(secondName);
+        firstSurname  = StringNormalizer.upper(firstSurname);
+        secondSurname = StringNormalizer.upper(secondSurname);
+        email         = StringNormalizer.upper(email);
+        phone         = StringNormalizer.trim(phone);
     }
 }

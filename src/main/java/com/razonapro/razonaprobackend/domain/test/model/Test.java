@@ -3,16 +3,20 @@ package com.razonapro.razonaprobackend.domain.test.model;
 import com.razonapro.razonaprobackend.domain.admin.model.Admin;
 import com.razonapro.razonaprobackend.domain.competence.model.Competence;
 import com.razonapro.razonaprobackend.shared.ids.TestPK;
-import com.razonapro.razonaprobackend.infrastructure.util.BooleanToYNConverter;
+import com.razonapro.razonaprobackend.shared.jpa.Normalizable;
+import com.razonapro.razonaprobackend.shared.jpa.NormalizingEntityListener;
+import com.razonapro.razonaprobackend.shared.util.StringNormalizer;
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.time.LocalDateTime;
 
 @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
 @Entity
-@Table(name = "tests", schema = "razonapro")
+@Table(name = "tests")
 @IdClass(TestPK.class)
-public class Test {
+@EntityListeners(NormalizingEntityListener.class)
+public class Test implements Normalizable {
 
     @Id
     @Column(name = "test_id", length = 8)
@@ -39,7 +43,6 @@ public class Test {
     @Column(name = "duration_seconds", nullable = false)
     private Integer durationSeconds;
 
-    @Convert(converter = BooleanToYNConverter.class)
     @Column(name = "is_active", columnDefinition = "CHAR(1)", nullable = false)
     @Builder.Default
     private Boolean isActive = true;
@@ -61,4 +64,10 @@ public class Test {
 
     @PreUpdate
     void onUpdate() { this.updatedAt = LocalDateTime.now(); }
+
+    @Override
+    public void normalize() {
+        testName    = StringNormalizer.upper(testName);
+        description = StringNormalizer.upper(description);
+    }
 }

@@ -2,11 +2,12 @@ package com.razonapro.razonaprobackend.domain.tried.controller;
 
 import com.razonapro.razonaprobackend.domain.tried.dto.request.StartTriedRequest;
 import com.razonapro.razonaprobackend.domain.tried.dto.request.SubmitAnswerRequest;
+import com.razonapro.razonaprobackend.domain.tried.dto.response.TriedDto;
+import com.razonapro.razonaprobackend.domain.tried.service.TriedService;
+import com.razonapro.razonaprobackend.infrastructure.security.UserPrincipal;
 import com.razonapro.razonaprobackend.shared.dto.ApiResponse;
 import com.razonapro.razonaprobackend.shared.dto.PagedResponse;
-import com.razonapro.razonaprobackend.domain.tried.dto.response.TriedDto;
-import com.razonapro.razonaprobackend.infrastructure.security.UserPrincipal;
-import com.razonapro.razonaprobackend.domain.tried.service.TriedService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -20,40 +21,38 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/trieds")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('ADMIN','STUDENT')")
+@Tag(name = "Trieds", description = "Intentos de tests por estudiante")
 public class TriedController {
 
     private final TriedService triedService;
 
-    /** GET /api/trieds/my — intentos propios del estudiante */
     @GetMapping("/my")
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<ApiResponse<PagedResponse<TriedDto>>> findMy(
             @AuthenticationPrincipal UserPrincipal principal,
-            @RequestParam(defaultValue = "0")  int page,
+            @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        var pageable = PageRequest.of(page, size, Sort.by("attemptTimestamp").descending());
-        return ResponseEntity.ok(ApiResponse.ok(triedService.findMyTrieds(principal, pageable)));
+        return ResponseEntity.ok(ApiResponse.ok(
+                triedService.findMyTrieds(principal,
+                        PageRequest.of(page, size, Sort.by("attemptTimestamp").descending()))));
     }
 
     @GetMapping("/{triedId}")
+    @PreAuthorize("hasAnyRole('ADMIN','STUDENT')")
     public ResponseEntity<ApiResponse<TriedDto>> findById(
-            @PathVariable String triedId,
-            @AuthenticationPrincipal UserPrincipal principal) {
+            @PathVariable String triedId, @AuthenticationPrincipal UserPrincipal principal) {
         return ResponseEntity.ok(ApiResponse.ok(triedService.findById(triedId, principal)));
     }
 
-    /** POST /api/trieds/start — iniciar intento */
     @PostMapping("/start")
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<ApiResponse<TriedDto>> start(
             @Valid @RequestBody StartTriedRequest req,
             @AuthenticationPrincipal UserPrincipal principal) {
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.ok("Intento iniciado", triedService.startTried(req, principal)));
+                .body(ApiResponse.ok("Intento iniciado", triedService.startTried(req, principal)));
     }
 
-    /** POST /api/trieds/{triedId}/answer — responder una pregunta */
     @PostMapping("/{triedId}/answer")
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<ApiResponse<TriedDto>> submitAnswer(
@@ -63,7 +62,6 @@ public class TriedController {
         return ResponseEntity.ok(ApiResponse.ok(triedService.submitAnswer(triedId, req, principal)));
     }
 
-    /** PUT /api/trieds/{triedId}/finish — finalizar intento */
     @PutMapping("/{triedId}/finish")
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<ApiResponse<TriedDto>> finish(
@@ -71,6 +69,6 @@ public class TriedController {
             @RequestParam(required = false) Integer timeSpentSeconds,
             @AuthenticationPrincipal UserPrincipal principal) {
         return ResponseEntity.ok(ApiResponse.ok(
-            "Intento finalizado", triedService.finishManually(triedId, timeSpentSeconds, principal)));
+                "Intento finalizado", triedService.finishManually(triedId, timeSpentSeconds, principal)));
     }
 }

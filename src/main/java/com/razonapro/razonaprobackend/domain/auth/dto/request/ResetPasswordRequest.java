@@ -14,9 +14,7 @@ public class ResetPasswordRequest {
 
     @NotBlank
     @Size(min = 8, max = 64)
-    @Pattern(
-            regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).+$",
-            message = "La contraseña debe tener mayúscula, minúscula y número"
-    )
+    @Pattern(regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).+$",
+            message = "La contraseña debe tener mayúscula, minúscula y número")
     private String newPassword;
 }

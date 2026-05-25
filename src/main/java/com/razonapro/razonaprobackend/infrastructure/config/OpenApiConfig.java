@@ -20,7 +20,7 @@ public class OpenApiConfig {
                 .info(new Info()
                         .title("RazonaPro API")
                         .version("1.0.0")
-                        .description("Backend para la plataforma de preparación académica RazonaPro")
+                        .description("Backend de la plataforma de preparación académica RazonaPro")
                         .contact(new Contact().name("RazonaPro Team")))
                 .addSecurityItem(new SecurityRequirement().addList(BEARER_SCHEME))
                 .components(new Components()

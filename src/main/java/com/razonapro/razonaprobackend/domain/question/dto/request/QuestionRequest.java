@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.Getter;
 import lombok.Setter;
+
 import java.util.List;
 
 @Getter @Setter
@@ -19,7 +20,7 @@ public class QuestionRequest {
     @Pattern(regexp = "^[BMA]$", message = "Dificultad: B=Básico, M=Medio, A=Alto")
     private String difficultyLevel;
 
-    @NotNull @Size(min = 2, message = "Debe haber minimo 2 opciones")
+    @NotNull @Size(min = 2, message = "Debe haber mínimo 2 opciones")
     @Valid
     private List<OptionRequest> options;
 }

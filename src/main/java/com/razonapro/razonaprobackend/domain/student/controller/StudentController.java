@@ -1,12 +1,13 @@
-// domain/student/controller/StudentController.java
 package com.razonapro.razonaprobackend.domain.student.controller;
 
+import com.razonapro.razonaprobackend.domain.student.dto.request.StudentUpdateRequest;
 import com.razonapro.razonaprobackend.domain.student.dto.response.StudentDto;
 import com.razonapro.razonaprobackend.domain.student.service.StudentService;
-import com.razonapro.razonaprobackend.domain.student.dto.request.StudentUpdateRequest;
 import com.razonapro.razonaprobackend.infrastructure.security.UserPrincipal;
 import com.razonapro.razonaprobackend.shared.dto.ApiResponse;
 import com.razonapro.razonaprobackend.shared.dto.PagedResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -19,18 +20,21 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/students")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
+@Tag(name = "Students", description = "Gestión de estudiantes")
 public class StudentController {
 
     private final StudentService studentService;
 
     @GetMapping("/me")
     @PreAuthorize("hasRole('STUDENT')")
+    @Operation(summary = "Perfil del estudiante autenticado")
     public ResponseEntity<ApiResponse<StudentDto>> me(@AuthenticationPrincipal UserPrincipal principal) {
         return ResponseEntity.ok(ApiResponse.ok(studentService.findById(principal.getId())));
     }
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Listar todos los estudiantes (Admin)")
     public ResponseEntity<ApiResponse<PagedResponse<StudentDto>>> findAll(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
@@ -39,17 +43,23 @@ public class StudentController {
     }
 
     @GetMapping("/{studentId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Obtener estudiante por código (Admin)")
     public ResponseEntity<ApiResponse<StudentDto>> findById(@PathVariable String studentId) {
         return ResponseEntity.ok(ApiResponse.ok(studentService.findById(studentId)));
     }
 
     @PutMapping("/{studentId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Actualizar estudiante (Admin)")
     public ResponseEntity<ApiResponse<StudentDto>> update(
             @PathVariable String studentId, @Valid @RequestBody StudentUpdateRequest req) {
         return ResponseEntity.ok(ApiResponse.ok(studentService.update(studentId, req)));
     }
 
     @DeleteMapping("/{studentId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Desactivar estudiante (Admin)")
     public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable String studentId) {
         studentService.deactivate(studentId);
         return ResponseEntity.ok(ApiResponse.ok("Estudiante desactivado"));

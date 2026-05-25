@@ -1,5 +1,6 @@
 package com.razonapro.razonaprobackend.infrastructure.config;
 
+import com.razonapro.razonaprobackend.infrastructure.security.AuthRateLimitFilter;
 import com.razonapro.razonaprobackend.infrastructure.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -15,14 +16,16 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfigurationSource;
+
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final JwtAuthenticationFilter jwtFilter;
-    private final CorsConfigurationSource corsConfigurationSource; // añadir esto
+    private final JwtAuthenticationFilter   jwtFilter;
+    private final AuthRateLimitFilter       rateLimitFilter;
+    private final CorsConfigurationSource   corsConfigurationSource;
 
     private static final String[] PUBLIC_ENDPOINTS = {
             "/api/health",
@@ -30,6 +33,7 @@ public class SecurityConfig {
             "/api/programs/active",
             "/api/competences",
             "/api/competences/**",
+            "/api/stats/home",
             "/swagger-ui.html",
             "/swagger-ui/**",
             "/api-docs",
@@ -41,13 +45,14 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
-                .cors(cors -> cors.configurationSource(corsConfigurationSource)) // cambiar esto
+                .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll() // añadir esto
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
                         .anyRequest().authenticated()
                 )
+                .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

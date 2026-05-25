@@ -1,11 +1,12 @@
 package com.razonapro.razonaprobackend.domain.question.controller;
 
 import com.razonapro.razonaprobackend.domain.question.dto.request.QuestionRequest;
+import com.razonapro.razonaprobackend.domain.question.dto.response.QuestionDto;
+import com.razonapro.razonaprobackend.domain.question.service.QuestionService;
+import com.razonapro.razonaprobackend.infrastructure.security.UserPrincipal;
 import com.razonapro.razonaprobackend.shared.dto.ApiResponse;
 import com.razonapro.razonaprobackend.shared.dto.PagedResponse;
-import com.razonapro.razonaprobackend.domain.question.dto.response.QuestionDto;
-import com.razonapro.razonaprobackend.infrastructure.security.UserPrincipal;
-import com.razonapro.razonaprobackend.domain.question.service.QuestionService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/competences/{competenceId}/questions")
 @RequiredArgsConstructor
+@Tag(name = "Questions", description = "Banco de preguntas por competencia")
 public class QuestionController {
 
     private final QuestionService questionService;
@@ -29,7 +31,7 @@ public class QuestionController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(ApiResponse.ok(
-            questionService.findByCompetence(competenceId, PageRequest.of(page, size))));
+                questionService.findByCompetence(competenceId, PageRequest.of(page, size))));
     }
 
     @GetMapping("/{questionId}")
@@ -46,7 +48,7 @@ public class QuestionController {
             @Valid @RequestBody QuestionRequest req,
             @AuthenticationPrincipal UserPrincipal principal) {
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.ok(questionService.create(competenceId, req, principal)));
+                .body(ApiResponse.ok(questionService.create(competenceId, req, principal)));
     }
 
     @DeleteMapping("/{questionId}")

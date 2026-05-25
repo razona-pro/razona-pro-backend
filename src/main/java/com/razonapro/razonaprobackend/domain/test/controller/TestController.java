@@ -1,12 +1,13 @@
 package com.razonapro.razonaprobackend.domain.test.controller;
 
+import com.razonapro.razonaprobackend.domain.question.dto.response.QuestionDto;
 import com.razonapro.razonaprobackend.domain.test.dto.request.TestRequest;
+import com.razonapro.razonaprobackend.domain.test.dto.response.TestDto;
+import com.razonapro.razonaprobackend.domain.test.service.TestService;
+import com.razonapro.razonaprobackend.infrastructure.security.UserPrincipal;
 import com.razonapro.razonaprobackend.shared.dto.ApiResponse;
 import com.razonapro.razonaprobackend.shared.dto.PagedResponse;
-import com.razonapro.razonaprobackend.domain.question.dto.response.QuestionDto;
-import com.razonapro.razonaprobackend.domain.test.dto.response.TestDto;
-import com.razonapro.razonaprobackend.infrastructure.security.UserPrincipal;
-import com.razonapro.razonaprobackend.domain.test.service.TestService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -22,6 +23,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/tests")
 @RequiredArgsConstructor
+@Tag(name = "Tests", description = "Tests y asignación de preguntas")
 public class TestController {
 
     private final TestService testService;
@@ -30,12 +32,12 @@ public class TestController {
     @PreAuthorize("hasAnyRole('ADMIN','STUDENT')")
     public ResponseEntity<ApiResponse<PagedResponse<TestDto>>> findAll(
             @AuthenticationPrincipal UserPrincipal principal,
-            @RequestParam(defaultValue = "0")  int page,
+            @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         boolean isAdmin = principal.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-        var pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        return ResponseEntity.ok(ApiResponse.ok(testService.findAll(pageable, !isAdmin)));
+        return ResponseEntity.ok(ApiResponse.ok(
+                testService.findAll(PageRequest.of(page, size, Sort.by("createdAt").descending()), !isAdmin)));
     }
 
     @GetMapping("/{testId}/{competenceId}")
@@ -48,8 +50,7 @@ public class TestController {
     @GetMapping("/{testId}/{competenceId}/questions")
     @PreAuthorize("hasAnyRole('ADMIN','STUDENT')")
     public ResponseEntity<ApiResponse<List<QuestionDto>>> getQuestions(
-            @PathVariable String testId,
-            @PathVariable String competenceId,
+            @PathVariable String testId, @PathVariable String competenceId,
             @AuthenticationPrincipal UserPrincipal principal) {
         boolean showCorrect = principal.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
@@ -69,21 +70,16 @@ public class TestController {
     @PostMapping("/{testId}/{competenceId}/questions/{questionId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> addQuestion(
-            @PathVariable String testId,
-            @PathVariable String competenceId,
-            @PathVariable String questionId,
+            @PathVariable String testId, @PathVariable String competenceId, @PathVariable String questionId,
             @AuthenticationPrincipal UserPrincipal principal) {
         testService.addQuestion(testId, competenceId, questionId, principal);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.ok("Pregunta agregada al test"));
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok("Pregunta agregada al test"));
     }
 
     @DeleteMapping("/{testId}/{competenceId}/questions/{questionId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> removeQuestion(
-            @PathVariable String testId,
-            @PathVariable String competenceId,
-            @PathVariable String questionId) {
+            @PathVariable String testId, @PathVariable String competenceId, @PathVariable String questionId) {
         testService.removeQuestion(testId, competenceId, questionId);
         return ResponseEntity.ok(ApiResponse.ok("Pregunta removida del test"));
     }
