@@ -25,7 +25,7 @@ public class StudentResponse {
     private String studentId;
     @Column(name = "tried_id",      length = 10, nullable = false)
     private String triedId;
-    @Column(name = "question_id",   length = 6,  nullable = false)
+    @Column(name = "question_id",   length = 7,  nullable = false)
     private String questionId;
     @Column(name = "option_id",     length = 6,  nullable = false)
     private String optionId;

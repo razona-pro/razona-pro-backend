@@ -38,7 +38,7 @@ public class TestQuestion {
     })
     private Test test;
 
-    @Column(name = "question_id", length = 6, nullable = false)
+    @Column(name = "question_id", length = 7, nullable = false)
     private String questionId;
 
     @ManyToOne(fetch = FetchType.LAZY)
