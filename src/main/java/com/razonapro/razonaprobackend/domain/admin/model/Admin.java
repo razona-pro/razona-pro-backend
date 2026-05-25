@@ -44,12 +44,31 @@ public class Admin {
     private LocalDateTime lastLoginAt;
 
     @Column(name = "created_at", nullable = false, updatable = false)
-    @Builder.Default
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt;
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @PrePersist
+    private void onInsert() {
+        normalizeFields();
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
     @PreUpdate
-    void onUpdate() { this.updatedAt = LocalDateTime.now(); }
+    private void onUpdate() {
+        normalizeFields();
+        updatedAt = LocalDateTime.now();
+    }
+
+    private void normalizeFields() {
+        if (adminId      != null) adminId      = adminId.trim().toUpperCase();
+        if (firstName    != null) firstName    = firstName.trim().toUpperCase();
+        if (secondName   != null) secondName   = secondName.trim().toUpperCase();
+        if (firstSurname != null) firstSurname = firstSurname.trim().toUpperCase();
+        if (secondSurname != null) secondSurname = secondSurname.trim().toUpperCase();
+        if (email        != null) email        = email.trim().toUpperCase();
+        if (phone        != null) phone        = phone.trim();
+    }
 }

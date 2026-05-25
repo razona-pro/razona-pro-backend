@@ -19,7 +19,7 @@ public class Question {
     private String competenceId;
 
     @Id
-    @Column(name = "question_id", length = 6)
+    @Column(name = "question_id", length = 7)
     private String questionId;
 
     @ManyToOne(fetch = FetchType.LAZY)

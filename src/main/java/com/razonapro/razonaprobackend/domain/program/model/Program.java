@@ -14,7 +14,7 @@ public class Program {
     @Column(name = "program_id", length = 3)
     private String programId;
 
-    @Column(name = "program_name", length = 20, nullable = false)
+    @Column(name = "program_name", length = 50, nullable = false)
     private String programName;
 
     @Column(name = "description", length = 100)

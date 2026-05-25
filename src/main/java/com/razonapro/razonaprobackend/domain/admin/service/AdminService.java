@@ -36,36 +36,39 @@ public class AdminService {
 
     @Transactional
     public AdminDto create(AdminCreateRequest req) {
-        if (adminRepository.existsByEmail(req.getEmail()))
+        String email = req.getEmail().trim().toUpperCase();
+        String phone = req.getPhone().trim();
+
+        if (adminRepository.existsByEmail(email))
             throw new ApiException("El email ya está en uso");
-        if (adminRepository.existsByPhone(req.getPhone()))
+        if (adminRepository.existsByPhone(phone))
             throw new ApiException("El teléfono ya está en uso");
 
         long count = adminRepository.count();
         Admin admin = Admin.builder()
-            .adminId(IdGenerator.adminId(count))
-            .firstName(req.getFirstName())
-            .secondName(req.getSecondName())
-            .firstSurname(req.getFirstSurname())
-            .secondSurname(req.getSecondSurname())
-            .email(req.getEmail())
-            .phone(req.getPhone())
-            .passwordHash(passwordEncoder.encode(req.getPassword()))
-            .build();
+                .adminId(IdGenerator.adminId(count))
+                .firstName(req.getFirstName().trim().toUpperCase())
+                .secondName(req.getSecondName() != null ? req.getSecondName().trim().toUpperCase() : null)
+                .firstSurname(req.getFirstSurname().trim().toUpperCase())
+                .secondSurname(req.getSecondSurname() != null ? req.getSecondSurname().trim().toUpperCase() : null)
+                .email(email)
+                .phone(phone)
+                .passwordHash(passwordEncoder.encode(req.getPassword()))
+                .build();
         return AdminDto.from(adminRepository.save(admin));
     }
 
     @Transactional
     public AdminDto update(String id, AdminUpdateRequest req) {
         Admin admin = adminRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Admin", id));
+                .orElseThrow(() -> new ResourceNotFoundException("Admin", id));
 
-        if (StringUtils.hasText(req.getFirstName()))    admin.setFirstName(req.getFirstName());
-        if (StringUtils.hasText(req.getSecondName()))   admin.setSecondName(req.getSecondName());
-        if (StringUtils.hasText(req.getFirstSurname())) admin.setFirstSurname(req.getFirstSurname());
-        if (StringUtils.hasText(req.getSecondSurname()))admin.setSecondSurname(req.getSecondSurname());
-        if (StringUtils.hasText(req.getPhone()))        admin.setPhone(req.getPhone());
-        if (req.getIsActive() != null)                  admin.setIsActive(req.getIsActive());
+        if (StringUtils.hasText(req.getFirstName()))     admin.setFirstName(req.getFirstName().trim().toUpperCase());
+        if (StringUtils.hasText(req.getSecondName()))    admin.setSecondName(req.getSecondName().trim().toUpperCase());
+        if (StringUtils.hasText(req.getFirstSurname()))  admin.setFirstSurname(req.getFirstSurname().trim().toUpperCase());
+        if (StringUtils.hasText(req.getSecondSurname())) admin.setSecondSurname(req.getSecondSurname().trim().toUpperCase());
+        if (StringUtils.hasText(req.getPhone()))         admin.setPhone(req.getPhone().trim());
+        if (req.getIsActive() != null)                   admin.setIsActive(req.getIsActive());
 
         return AdminDto.from(adminRepository.save(admin));
     }

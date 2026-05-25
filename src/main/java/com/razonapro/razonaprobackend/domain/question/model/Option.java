@@ -16,7 +16,7 @@ public class Option {
     private String competenceId;
 
     @Id
-    @Column(name = "question_id", length = 6)
+    @Column(name = "question_id", length = 7)
     private String questionId;
 
     @Id

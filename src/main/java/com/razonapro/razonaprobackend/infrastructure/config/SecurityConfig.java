@@ -29,7 +29,12 @@ public class SecurityConfig {
             "/api/auth/**",
             "/api/programs/active",
             "/api/competences",
-            "/api/competences/**"
+            "/api/competences/**",
+            "/swagger-ui.html",
+            "/swagger-ui/**",
+            "/api-docs",
+            "/api-docs/**",
+            "/v3/api-docs/**"
     };
 
     @Bean
