@@ -1,0 +1,141 @@
+package com.razonapro.razonaprobackend.domain.test.service;
+
+import com.razonapro.razonaprobackend.domain.admin.repository.AdminRepository;
+import com.razonapro.razonaprobackend.domain.competence.repository.CompetenceRepository;
+import com.razonapro.razonaprobackend.domain.question.dto.response.OptionDto;
+import com.razonapro.razonaprobackend.domain.question.repository.OptionRepository;
+import com.razonapro.razonaprobackend.domain.question.repository.QuestionRepository;
+import com.razonapro.razonaprobackend.domain.test.dto.request.TestRequest;
+import com.razonapro.razonaprobackend.domain.test.repository.TestQuestionRepository;
+import com.razonapro.razonaprobackend.domain.test.repository.TestRepository;
+import com.razonapro.razonaprobackend.shared.dto.PagedResponse;
+import com.razonapro.razonaprobackend.domain.question.dto.response.QuestionDto;
+import com.razonapro.razonaprobackend.domain.test.dto.response.TestDto;
+import com.razonapro.razonaprobackend.shared.exception.ApiException;
+import com.razonapro.razonaprobackend.shared.exception.ResourceNotFoundException;
+import com.razonapro.razonaprobackend.domain.test.model.Test;
+import com.razonapro.razonaprobackend.domain.test.model.TestQuestion;
+import com.razonapro.razonaprobackend.shared.ids.QuestionId;
+import com.razonapro.razonaprobackend.shared.ids.TestPK;
+import com.razonapro.razonaprobackend.infrastructure.security.UserPrincipal;
+import com.razonapro.razonaprobackend.infrastructure.util.IdGenerator;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Collections;
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class TestService {
+
+    private final TestRepository         testRepository;
+    private final TestQuestionRepository testQuestionRepository;
+    private final QuestionRepository     questionRepository;
+    private final OptionRepository       optionRepository;
+    private final CompetenceRepository   competenceRepository;
+    private final AdminRepository        adminRepository;
+
+    @Transactional(readOnly = true)
+    public PagedResponse<TestDto> findAll(Pageable pageable, boolean activeOnly) {
+        Page<Test> page = activeOnly
+                ? testRepository.findAllActiveWithCompetence(pageable)
+                : testRepository.findAllWithCompetence(pageable);
+        return PagedResponse.from(page.map(TestDto::from));
+    }
+
+    @Transactional(readOnly = true)
+    public TestDto findById(String testId, String competenceId) {
+        Test test = testRepository.findById(new TestPK(testId, competenceId))
+                .orElseThrow(() -> new ResourceNotFoundException("Test", testId));
+        return TestDto.from(test);
+    }
+
+    @Transactional(readOnly = true)
+    public List<QuestionDto> getTestQuestions(String testId, String competenceId, boolean showCorrect) {
+        List<TestQuestion> tqs = testQuestionRepository
+                .findByTestIdAndCompetenceIdAndIsActiveTrue(testId, competenceId);
+
+        Test test = testRepository.findById(new TestPK(testId, competenceId))
+                .orElseThrow(() -> new ResourceNotFoundException("Test", testId));
+
+        List<TestQuestion> selected = tqs;
+        if (test.getQuestionsToPresent() != null && test.getQuestionsToPresent() < tqs.size()) {
+            selected = new java.util.ArrayList<>(tqs);
+            Collections.shuffle(selected);
+            selected = selected.subList(0, test.getQuestionsToPresent());
+        }
+
+        return selected.stream().map(tq -> {
+            var q = questionRepository.findById(new QuestionId(tq.getCompetenceId(), tq.getQuestionId()))
+                    .orElseThrow();
+            var opts = optionRepository.findByCompetenceIdAndQuestionId(tq.getCompetenceId(), tq.getQuestionId());
+            if (showCorrect) return QuestionDto.from(q, opts);
+            var masked = opts.stream().map(OptionDto::fromMasked).toList();
+            return QuestionDto.builder()
+                    .competenceId(q.getCompetenceId())
+                    .questionId(q.getQuestionId())
+                    .statement(q.getStatement())
+                    .difficultyLevel(q.getDifficultyLevel())
+                    .options(masked)
+                    .build();
+        }).toList();
+    }
+
+    @Transactional
+    public TestDto create(TestRequest req, UserPrincipal principal) {
+        competenceRepository.findById(req.getCompetenceId())
+                .orElseThrow(() -> new ResourceNotFoundException("Competencia", req.getCompetenceId()));
+        long count = testRepository.count();
+        Test test = Test.builder()
+                .testId(IdGenerator.testId(count))
+                .competenceId(req.getCompetenceId())
+                .admin(adminRepository.findById(principal.getId()).orElseThrow())
+                .testName(req.getTestName().trim().toUpperCase())
+                .description(req.getDescription() != null ? req.getDescription().trim().toUpperCase() : null)
+                .durationSeconds(req.getDurationSeconds())
+                .questionsToPresent(req.getQuestionsToPresent())
+                .testMode(req.getTestMode())
+                .build();
+        return TestDto.from(testRepository.save(test));
+    }
+
+    @Transactional
+    public void addQuestion(String testId, String competenceId, String questionId, UserPrincipal principal) {
+        testRepository.findById(new TestPK(testId, competenceId))
+                .orElseThrow(() -> new ResourceNotFoundException("Test", testId));
+        questionRepository.findById(new QuestionId(competenceId, questionId))
+                .orElseThrow(() -> new ResourceNotFoundException("Pregunta", questionId));
+        if (testQuestionRepository.existsByCompetenceIdAndTestIdAndQuestionId(competenceId, testId, questionId))
+            throw new ApiException("La pregunta ya está asignada a este test");
+        long order = testQuestionRepository.countByTestIdAndCompetenceId(testId, competenceId) + 1;
+        TestQuestion tq = TestQuestion.builder()
+                .admin(adminRepository.findById(principal.getId()).orElseThrow())
+                .competenceId(competenceId)
+                .testId(testId)
+                .questionId(questionId)
+                .questionOrder((int) order)
+                .build();
+        testQuestionRepository.save(tq);
+    }
+
+    @Transactional
+    public void removeQuestion(String testId, String competenceId, String questionId) {
+        TestQuestion tq = testQuestionRepository
+                .findByCompetenceIdAndTestIdAndQuestionId(competenceId, testId, questionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Pregunta en test", questionId));
+        tq.setIsActive(false);
+        testQuestionRepository.save(tq);
+    }
+
+    @Transactional
+    public void deactivate(String testId, String competenceId) {
+        Test test = testRepository.findById(new TestPK(testId, competenceId))
+                .orElseThrow(() -> new ResourceNotFoundException("Test", testId));
+        test.setIsActive(false);
+        testRepository.save(test);
+    }
+}
