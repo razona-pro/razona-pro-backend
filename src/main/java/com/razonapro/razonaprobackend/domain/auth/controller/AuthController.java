@@ -2,9 +2,9 @@ package com.razonapro.razonaprobackend.domain.auth.controller;
 
 import com.razonapro.razonaprobackend.domain.auth.dto.request.UnifiedLoginRequest;
 import com.razonapro.razonaprobackend.domain.auth.dto.request.StudentRegisterRequest;
-import com.razonapro.razonaprobackend.dtos.request.AdminForgotPasswordRequest;
-import com.razonapro.razonaprobackend.dtos.request.ForgotPasswordRequest;
-import com.razonapro.razonaprobackend.dtos.request.ResetPasswordRequest;
+import com.razonapro.razonaprobackend.domain.auth.dto.request.AdminForgotPasswordRequest;
+import com.razonapro.razonaprobackend.domain.auth.dto.request.ForgotPasswordRequest;
+import com.razonapro.razonaprobackend.domain.auth.dto.request.ResetPasswordRequest;
 import com.razonapro.razonaprobackend.shared.dto.ApiResponse;
 import com.razonapro.razonaprobackend.domain.auth.dto.response.AuthResponse;
 import com.razonapro.razonaprobackend.domain.student.dto.response.StudentDto;

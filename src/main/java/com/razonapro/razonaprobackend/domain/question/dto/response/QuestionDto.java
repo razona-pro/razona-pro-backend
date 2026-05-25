@@ -1,7 +1,6 @@
 package com.razonapro.razonaprobackend.domain.question.dto.response;
 
-import com.razonapro.razonaprobackend.dtos.response.OptionDto;
-import com.razonapro.razonaprobackend.models.Option;
+import com.razonapro.razonaprobackend.domain.question.model.Option;
 import com.razonapro.razonaprobackend.domain.question.model.Question;
 import lombok.Builder;
 import lombok.Getter;

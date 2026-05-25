@@ -1,7 +1,7 @@
 package com.razonapro.razonaprobackend.domain.student.model;
 
 import com.razonapro.razonaprobackend.infrastructure.util.BooleanToYNConverter;
-import com.razonapro.razonaprobackend.models.ids.StudentId;
+import com.razonapro.razonaprobackend.shared.ids.StudentId;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -38,8 +38,13 @@ public class Student {
     @Column(name = "phone", length = 15, nullable = false, unique = true)
     private String phone;
 
-    @Column(name = "password_hash", length = 60, nullable = false)
+    @Column(name = "password_hash", length = 72, nullable = false)
     private String passwordHash;
+
+    @Convert(converter = BooleanToYNConverter.class)
+    @Column(name = "is_active", nullable = false, length = 1)
+    @Builder.Default
+    private Boolean isActive = true;
 
     @Convert(converter = BooleanToYNConverter.class)
     @Column(name = "email_verified", nullable = false, length = 1)
@@ -47,9 +52,9 @@ public class Student {
     private Boolean emailVerified = false;
 
     @Convert(converter = BooleanToYNConverter.class)
-    @Column(name = "is_active", nullable = false, length = 1)
+    @Column(name = "identity_verified", nullable = false, length = 1)
     @Builder.Default
-    private Boolean isActive = true;
+    private Boolean identityVerified = false;
 
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
@@ -59,8 +64,6 @@ public class Student {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-
-    // ── Lifecycle hooks ───────────────────────────────────────
 
     @PrePersist
     private void onInsert() {
@@ -77,13 +80,12 @@ public class Student {
 
     private void normalizeFields() {
         if (studentId     != null) studentId     = studentId.trim().toUpperCase();
-        if (programId     != null) programId     = programId.trim().toUpperCase();
+        if (programId     != null) programId     = programId.trim();
         if (firstName     != null) firstName     = firstName.trim().toUpperCase();
         if (secondName    != null) secondName    = secondName.trim().toUpperCase();
         if (firstSurname  != null) firstSurname  = firstSurname.trim().toUpperCase();
         if (secondSurname != null) secondSurname = secondSurname.trim().toUpperCase();
         if (email         != null) email         = email.trim().toUpperCase();
         if (phone         != null) phone         = phone.trim();
-        // passwordHash → NUNCA toUpperCase, bcrypt es case-sensitive
     }
 }

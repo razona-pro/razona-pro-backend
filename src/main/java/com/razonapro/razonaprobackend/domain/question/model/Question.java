@@ -2,7 +2,7 @@ package com.razonapro.razonaprobackend.domain.question.model;
 
 import com.razonapro.razonaprobackend.domain.admin.model.Admin;
 import com.razonapro.razonaprobackend.domain.competence.model.Competence;
-import com.razonapro.razonaprobackend.models.ids.QuestionId;
+import com.razonapro.razonaprobackend.shared.ids.QuestionId;
 import com.razonapro.razonaprobackend.infrastructure.util.BooleanToYNConverter;
 import jakarta.persistence.*;
 import lombok.*;

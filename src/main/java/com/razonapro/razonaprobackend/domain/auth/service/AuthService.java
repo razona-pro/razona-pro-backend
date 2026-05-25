@@ -10,19 +10,19 @@ import com.razonapro.razonaprobackend.domain.program.repository.ProgramRepositor
 import com.razonapro.razonaprobackend.domain.student.dto.response.StudentDto;
 import com.razonapro.razonaprobackend.domain.student.model.Student;
 import com.razonapro.razonaprobackend.domain.student.repository.StudentRepository;
-import com.razonapro.razonaprobackend.dtos.request.AdminForgotPasswordRequest;
-import com.razonapro.razonaprobackend.dtos.request.ForgotPasswordRequest;
-import com.razonapro.razonaprobackend.dtos.request.ResetPasswordRequest;
+import com.razonapro.razonaprobackend.domain.auth.dto.request.AdminForgotPasswordRequest;
+import com.razonapro.razonaprobackend.domain.auth.dto.request.ForgotPasswordRequest;
+import com.razonapro.razonaprobackend.domain.auth.dto.request.ResetPasswordRequest;
 import com.razonapro.razonaprobackend.infrastructure.security.JwtService;
-import com.razonapro.razonaprobackend.models.AdminToken;
-import com.razonapro.razonaprobackend.models.StudentToken;
-import com.razonapro.razonaprobackend.models.enums.AdminTokenType;
-import com.razonapro.razonaprobackend.models.enums.StudentTokenType;
-import com.razonapro.razonaprobackend.repositories.AdminTokenRepository;
-import com.razonapro.razonaprobackend.repositories.StudentTokenRepository;
-import com.razonapro.razonaprobackend.services.EmailService;
+import com.razonapro.razonaprobackend.domain.auth.model.AdminToken;
+import com.razonapro.razonaprobackend.domain.auth.model.StudentToken;
+import com.razonapro.razonaprobackend.domain.auth.model.enums.AdminTokenType;
+import com.razonapro.razonaprobackend.domain.auth.model.enums.StudentTokenType;
+import com.razonapro.razonaprobackend.domain.auth.repository.AdminTokenRepository;
+import com.razonapro.razonaprobackend.domain.auth.repository.StudentTokenRepository;
+import com.razonapro.razonaprobackend.infrastructure.email.EmailService;
 import com.razonapro.razonaprobackend.shared.exception.ApiException;
-import com.razonapro.razonaprobackend.util.TokenHashUtil;
+import com.razonapro.razonaprobackend.infrastructure.util.TokenHashUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -76,8 +76,7 @@ public class AuthService {
         adminRepository.save(admin);
         return AuthResponse.builder()
                 .token(jwtService.generateAdminToken(admin.getAdminId(), admin.getEmail()))
-                .userType("ADMIN").id(admin.getAdminId()).email(admin.getEmail())
-                .firstName(admin.getFirstName()).firstSurname(admin.getFirstSurname()).build();
+                .build();
     }
 
     private AuthResponse handleStudentLogin(String email, String password, String code) {
@@ -95,8 +94,7 @@ public class AuthService {
         studentRepository.save(student);
         return AuthResponse.builder()
                 .token(jwtService.generateStudentToken(student.getStudentId(), student.getProgramId(), student.getEmail()))
-                .userType("STUDENT").id(student.getStudentId()).programId(student.getProgramId())
-                .email(student.getEmail()).firstName(student.getFirstName()).firstSurname(student.getFirstSurname()).build();
+                .build();
     }
 
     // ── Registro ──────────────────────────────────────────────

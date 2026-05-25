@@ -1,7 +1,7 @@
 package com.razonapro.razonaprobackend.domain.student.repository;
 
 import com.razonapro.razonaprobackend.domain.student.model.Student;
-import com.razonapro.razonaprobackend.models.ids.StudentId;
+import com.razonapro.razonaprobackend.shared.ids.StudentId;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import java.util.Optional;

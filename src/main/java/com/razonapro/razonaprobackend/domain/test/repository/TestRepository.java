@@ -1,7 +1,7 @@
 package com.razonapro.razonaprobackend.domain.test.repository;
 
 import com.razonapro.razonaprobackend.domain.test.model.Test;
-import com.razonapro.razonaprobackend.models.ids.TestPK;
+import com.razonapro.razonaprobackend.shared.ids.TestPK;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

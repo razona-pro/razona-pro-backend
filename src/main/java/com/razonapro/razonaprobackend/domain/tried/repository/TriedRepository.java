@@ -1,7 +1,7 @@
 package com.razonapro.razonaprobackend.domain.tried.repository;
 
 import com.razonapro.razonaprobackend.domain.tried.model.Tried;
-import com.razonapro.razonaprobackend.models.ids.TriedId;
+import com.razonapro.razonaprobackend.shared.ids.TriedId;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

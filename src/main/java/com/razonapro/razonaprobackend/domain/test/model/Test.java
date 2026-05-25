@@ -2,7 +2,7 @@ package com.razonapro.razonaprobackend.domain.test.model;
 
 import com.razonapro.razonaprobackend.domain.admin.model.Admin;
 import com.razonapro.razonaprobackend.domain.competence.model.Competence;
-import com.razonapro.razonaprobackend.models.ids.TestPK;
+import com.razonapro.razonaprobackend.shared.ids.TestPK;
 import com.razonapro.razonaprobackend.infrastructure.util.BooleanToYNConverter;
 import jakarta.persistence.*;
 import lombok.*;

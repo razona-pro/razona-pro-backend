@@ -4,7 +4,7 @@ import com.razonapro.razonaprobackend.domain.ranking.dto.request.RankingRequest;
 import com.razonapro.razonaprobackend.shared.dto.ApiResponse;
 import com.razonapro.razonaprobackend.shared.dto.PagedResponse;
 import com.razonapro.razonaprobackend.domain.ranking.dto.response.RankingDto;
-import com.razonapro.razonaprobackend.dtos.response.RankingStudentDto;
+import com.razonapro.razonaprobackend.domain.ranking.dto.response.RankingStudentDto;
 import com.razonapro.razonaprobackend.domain.ranking.service.RankingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

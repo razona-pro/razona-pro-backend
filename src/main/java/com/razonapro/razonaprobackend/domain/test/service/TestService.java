@@ -2,8 +2,11 @@ package com.razonapro.razonaprobackend.domain.test.service;
 
 import com.razonapro.razonaprobackend.domain.admin.repository.AdminRepository;
 import com.razonapro.razonaprobackend.domain.competence.repository.CompetenceRepository;
+import com.razonapro.razonaprobackend.domain.question.dto.response.OptionDto;
+import com.razonapro.razonaprobackend.domain.question.repository.OptionRepository;
 import com.razonapro.razonaprobackend.domain.question.repository.QuestionRepository;
 import com.razonapro.razonaprobackend.domain.test.dto.request.TestRequest;
+import com.razonapro.razonaprobackend.domain.test.repository.TestQuestionRepository;
 import com.razonapro.razonaprobackend.domain.test.repository.TestRepository;
 import com.razonapro.razonaprobackend.shared.dto.PagedResponse;
 import com.razonapro.razonaprobackend.domain.question.dto.response.QuestionDto;
@@ -11,10 +14,9 @@ import com.razonapro.razonaprobackend.domain.test.dto.response.TestDto;
 import com.razonapro.razonaprobackend.shared.exception.ApiException;
 import com.razonapro.razonaprobackend.shared.exception.ResourceNotFoundException;
 import com.razonapro.razonaprobackend.domain.test.model.Test;
-import com.razonapro.razonaprobackend.models.TestQuestion;
-import com.razonapro.razonaprobackend.models.ids.QuestionId;
-import com.razonapro.razonaprobackend.models.ids.TestPK;
-import com.razonapro.razonaprobackend.repositories.*;
+import com.razonapro.razonaprobackend.domain.test.model.TestQuestion;
+import com.razonapro.razonaprobackend.shared.ids.QuestionId;
+import com.razonapro.razonaprobackend.shared.ids.TestPK;
 import com.razonapro.razonaprobackend.infrastructure.security.UserPrincipal;
 import com.razonapro.razonaprobackend.infrastructure.util.IdGenerator;
 import lombok.RequiredArgsConstructor;
@@ -33,7 +35,7 @@ public class TestService {
     private final TestRepository testRepository;
     private final TestQuestionRepository testQuestionRepository;
     private final QuestionRepository questionRepository;
-    private final OptionRepository       optionRepository;
+    private final OptionRepository optionRepository;
     private final CompetenceRepository competenceRepository;
     private final AdminRepository adminRepository;
 
@@ -73,7 +75,7 @@ public class TestService {
             if (showCorrect) return QuestionDto.from(q, opts);
             // Enmascarar respuesta correcta durante el examen
             var maskedOpts = opts.stream()
-                .map(o -> com.razonapro.razonaprobackend.dtos.response.OptionDto.fromMasked(o))
+                .map(o -> OptionDto.fromMasked(o))
                 .toList();
             return QuestionDto.builder()
                 .competenceId(q.getCompetenceId())

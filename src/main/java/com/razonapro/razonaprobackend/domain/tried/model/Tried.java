@@ -2,7 +2,7 @@ package com.razonapro.razonaprobackend.domain.tried.model;
 
 import com.razonapro.razonaprobackend.domain.student.model.Student;
 import com.razonapro.razonaprobackend.domain.test.model.Test;
-import com.razonapro.razonaprobackend.models.ids.TriedId;
+import com.razonapro.razonaprobackend.shared.ids.TriedId;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;

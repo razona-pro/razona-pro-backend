@@ -1,20 +1,23 @@
 package com.razonapro.razonaprobackend.domain.tried.service;
 
+import com.razonapro.razonaprobackend.domain.question.model.Option;
+import com.razonapro.razonaprobackend.domain.question.repository.OptionRepository;
 import com.razonapro.razonaprobackend.domain.student.repository.StudentRepository;
 import com.razonapro.razonaprobackend.domain.test.model.Test;
+import com.razonapro.razonaprobackend.domain.test.repository.TestQuestionRepository;
 import com.razonapro.razonaprobackend.domain.test.repository.TestRepository;
+import com.razonapro.razonaprobackend.domain.tried.model.StudentResponse;
 import com.razonapro.razonaprobackend.domain.tried.model.Tried;
+import com.razonapro.razonaprobackend.domain.tried.repository.StudentResponseRepository;
 import com.razonapro.razonaprobackend.domain.tried.repository.TriedRepository;
-import com.razonapro.razonaprobackend.dtos.request.StartTriedRequest;
-import com.razonapro.razonaprobackend.dtos.request.SubmitAnswerRequest;
+import com.razonapro.razonaprobackend.domain.tried.dto.request.StartTriedRequest;
+import com.razonapro.razonaprobackend.domain.tried.dto.request.SubmitAnswerRequest;
 import com.razonapro.razonaprobackend.shared.dto.PagedResponse;
 import com.razonapro.razonaprobackend.domain.tried.dto.response.TriedDto;
 import com.razonapro.razonaprobackend.shared.exception.ApiException;
 import com.razonapro.razonaprobackend.shared.exception.ResourceNotFoundException;
-import com.razonapro.razonaprobackend.models.*;
-import com.razonapro.razonaprobackend.models.ids.OptionId;
-import com.razonapro.razonaprobackend.models.ids.TestPK;
-import com.razonapro.razonaprobackend.repositories.*;
+import com.razonapro.razonaprobackend.shared.ids.OptionId;
+import com.razonapro.razonaprobackend.shared.ids.TestPK;
 import com.razonapro.razonaprobackend.infrastructure.security.UserPrincipal;
 import com.razonapro.razonaprobackend.infrastructure.util.IdGenerator;
 import lombok.RequiredArgsConstructor;
@@ -36,8 +39,8 @@ public class TriedService {
     private final TriedRepository triedRepository;
     private final StudentResponseRepository responseRepository;
     private final TestRepository testRepository;
-    private final TestQuestionRepository   testQuestionRepository;
-    private final OptionRepository         optionRepository;
+    private final TestQuestionRepository testQuestionRepository;
+    private final OptionRepository optionRepository;
     private final StudentRepository studentRepository;
 
     public PagedResponse<TriedDto> findMyTrieds(UserPrincipal principal, Pageable pageable) {

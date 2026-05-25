@@ -1,7 +1,7 @@
 package com.razonapro.razonaprobackend.domain.question.repository;
 
 import com.razonapro.razonaprobackend.domain.question.model.Question;
-import com.razonapro.razonaprobackend.models.ids.QuestionId;
+import com.razonapro.razonaprobackend.shared.ids.QuestionId;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

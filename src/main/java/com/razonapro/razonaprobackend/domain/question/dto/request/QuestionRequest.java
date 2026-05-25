@@ -1,6 +1,5 @@
 package com.razonapro.razonaprobackend.domain.question.dto.request;
 
-import com.razonapro.razonaprobackend.dtos.request.OptionRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.Getter;

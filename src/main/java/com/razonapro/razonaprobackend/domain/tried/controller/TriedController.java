@@ -1,7 +1,7 @@
 package com.razonapro.razonaprobackend.domain.tried.controller;
 
-import com.razonapro.razonaprobackend.dtos.request.StartTriedRequest;
-import com.razonapro.razonaprobackend.dtos.request.SubmitAnswerRequest;
+import com.razonapro.razonaprobackend.domain.tried.dto.request.StartTriedRequest;
+import com.razonapro.razonaprobackend.domain.tried.dto.request.SubmitAnswerRequest;
 import com.razonapro.razonaprobackend.shared.dto.ApiResponse;
 import com.razonapro.razonaprobackend.shared.dto.PagedResponse;
 import com.razonapro.razonaprobackend.domain.tried.dto.response.TriedDto;

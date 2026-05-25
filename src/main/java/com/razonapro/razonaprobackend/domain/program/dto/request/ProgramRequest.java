@@ -6,10 +6,11 @@ import lombok.Setter;
 
 @Getter @Setter
 public class ProgramRequest {
-    @NotBlank @Size(min = 2, max = 3, message = "El ID del programa debe tener 2-3 caracteres")
+    @NotBlank
+    @Pattern(regexp = "^[0-9]{3}$", message = "El ID del programa debe ser exactamente 3 dígitos numéricos")
     private String programId;
 
-    @NotBlank @Size(max = 20)
+    @NotBlank @Size(max = 50)
     private String programName;
 
     @Size(max = 100)

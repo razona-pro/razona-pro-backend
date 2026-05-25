@@ -4,7 +4,7 @@ package com.razonapro.razonaprobackend.domain.student.service;
 import com.razonapro.razonaprobackend.domain.student.dto.response.StudentDto;
 import com.razonapro.razonaprobackend.domain.student.model.Student;
 import com.razonapro.razonaprobackend.domain.student.repository.StudentRepository;
-import com.razonapro.razonaprobackend.dtos.request.StudentUpdateRequest;
+import com.razonapro.razonaprobackend.domain.student.dto.request.StudentUpdateRequest;
 import com.razonapro.razonaprobackend.shared.dto.PagedResponse;
 import com.razonapro.razonaprobackend.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
