@@ -1,9 +1,12 @@
 package com.razonapro.razonaprobackend.domain.tried.service;
 
 import com.razonapro.razonaprobackend.domain.question.model.Option;
+import com.razonapro.razonaprobackend.domain.question.model.Question;
 import com.razonapro.razonaprobackend.domain.question.repository.OptionRepository;
+import com.razonapro.razonaprobackend.domain.question.repository.QuestionRepository;
 import com.razonapro.razonaprobackend.domain.student.repository.StudentRepository;
 import com.razonapro.razonaprobackend.domain.test.model.Test;
+import com.razonapro.razonaprobackend.domain.test.model.TestQuestion;
 import com.razonapro.razonaprobackend.domain.test.repository.TestQuestionRepository;
 import com.razonapro.razonaprobackend.domain.test.repository.TestRepository;
 import com.razonapro.razonaprobackend.domain.tried.dto.request.StartTriedRequest;
@@ -20,6 +23,7 @@ import com.razonapro.razonaprobackend.shared.exception.ApiException;
 import com.razonapro.razonaprobackend.shared.exception.ErrorCode;
 import com.razonapro.razonaprobackend.shared.exception.ResourceNotFoundException;
 import com.razonapro.razonaprobackend.shared.ids.OptionId;
+import com.razonapro.razonaprobackend.shared.ids.QuestionId;
 import com.razonapro.razonaprobackend.shared.ids.TestPK;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -30,6 +34,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -41,7 +47,10 @@ public class TriedService {
     private final TestRepository            testRepository;
     private final TestQuestionRepository    testQuestionRepository;
     private final OptionRepository          optionRepository;
+    private final QuestionRepository        questionRepository;
     private final StudentRepository         studentRepository;
+
+    // ── Consultas ────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public PagedResponse<TriedDto> findMyTrieds(UserPrincipal principal, Pageable pageable) {
@@ -59,6 +68,8 @@ public class TriedService {
         return TriedDto.from(tried);
     }
 
+    // ── Iniciar intento ──────────────────────────────────────────────────
+
     @Transactional
     public TriedDto startTried(StartTriedRequest req, UserPrincipal principal) {
         Test test = testRepository.findById(new TestPK(req.getTestId(), req.getCompetenceId()))
@@ -74,13 +85,16 @@ public class TriedService {
         if (alreadyInProgress)
             throw new ApiException(ErrorCode.TRIED_IN_PROGRESS);
 
-        long total = testQuestionRepository.countByTestIdAndCompetenceId(req.getTestId(), req.getCompetenceId());
-        if (total == 0)
+        List<TestQuestion> tqs = testQuestionRepository
+                .findByTestIdAndCompetenceIdAndIsActiveTrue(req.getTestId(), req.getCompetenceId());
+        if (tqs.isEmpty())
             throw new ApiException(ErrorCode.TEST_NO_QUESTIONS);
 
-        int questionsCount = test.getQuestionsToPresent() != null
-                ? Math.min(test.getQuestionsToPresent(), (int) total)
-                : (int) total;
+        List<TestQuestion> selected = new ArrayList<>(tqs);
+        if (test.getQuestionsToPresent() != null && test.getQuestionsToPresent() < tqs.size()) {
+            Collections.shuffle(selected);
+            selected = selected.subList(0, test.getQuestionsToPresent());
+        }
 
         Tried tried = Tried.builder()
                 .competenceId(req.getCompetenceId())
@@ -88,11 +102,15 @@ public class TriedService {
                 .programId(principal.getProgramId())
                 .studentId(principal.getId())
                 .triedId(IdGenerator.triedId())
-                .totalQuestions(questionsCount)
+                .totalQuestions(selected.size())
                 .build();
 
-        return TriedDto.from(triedRepository.save(tried));
+        triedRepository.save(tried);
+
+        return TriedDto.fromWithQuestions(tried, selected);
     }
+
+    // ── Responder pregunta ───────────────────────────────────────────────
 
     @Transactional
     public TriedDto submitAnswer(String triedId, SubmitAnswerRequest req, UserPrincipal principal) {
@@ -123,15 +141,20 @@ public class TriedService {
                 .answeredAt(LocalDateTime.now())
                 .build());
 
+        // Actualizar contador de correctas
         long correct = responseRepository.countByTriedIdAndIsCorrectTrue(triedId);
         tried.setCorrectAnswers((int) correct);
 
+        // Auto-finalizar si se respondieron todas
         long answered = responseRepository.findByTriedId(triedId).size();
         if (answered >= tried.getTotalQuestions()) {
             finishTried(tried);
         }
+
         return TriedDto.from(triedRepository.save(tried));
     }
+
+    // ── Finalizar manualmente ────────────────────────────────────────────
 
     @Transactional
     public TriedDto finishManually(String triedId, Integer timeSpentSeconds, UserPrincipal principal) {
@@ -147,16 +170,46 @@ public class TriedService {
         return TriedDto.from(triedRepository.save(tried));
     }
 
+    // ── Helpers privados ─────────────────────────────────────────────────
+
     private void finishTried(Tried tried) {
         tried.setStatus("FINISHED");
         tried.setFinishedAt(LocalDateTime.now());
-        if (tried.getTotalQuestions() > 0 && tried.getCorrectAnswers() != null) {
-            BigDecimal score = BigDecimal.valueOf(tried.getCorrectAnswers())
-                    .divide(BigDecimal.valueOf(tried.getTotalQuestions()), 4, RoundingMode.HALF_UP)
+
+        List<StudentResponse> responses = responseRepository.findByTriedId(tried.getTriedId());
+
+        int totalPoints  = 0;
+        int earnedPoints = 0;
+
+        for (StudentResponse sr : responses) {
+            Question q = questionRepository
+                    .findById(new QuestionId(tried.getCompetenceId(), sr.getQuestionId()))
+                    .orElse(null);
+            int pts = (q != null) ? difficultyPoints(q.getDifficultyLevel()) : 3;
+            totalPoints += pts;
+            if (Boolean.TRUE.equals(sr.getIsCorrect())) earnedPoints += pts;
+        }
+
+        if (totalPoints > 0) {
+            BigDecimal score = BigDecimal.valueOf(earnedPoints)
+                    .divide(BigDecimal.valueOf(totalPoints), 4, RoundingMode.HALF_UP)
                     .multiply(BigDecimal.valueOf(100))
                     .setScale(2, RoundingMode.HALF_UP);
             tried.setScore(score);
         }
+
+        long correct = responses.stream()
+                .filter(r -> Boolean.TRUE.equals(r.getIsCorrect()))
+                .count();
+        tried.setCorrectAnswers((int) correct);
+    }
+
+    private int difficultyPoints(String level) {
+        return switch (level == null ? "M" : level) {
+            case "B" -> 1;
+            case "A" -> 5;
+            default  -> 3;
+        };
     }
 
     private void assertOwnership(Tried tried, UserPrincipal principal) {
