@@ -4,6 +4,7 @@ import com.razonapro.razonaprobackend.domain.admin.dto.request.AdminCreateReques
 import com.razonapro.razonaprobackend.domain.admin.dto.request.AdminUpdateRequest;
 import com.razonapro.razonaprobackend.domain.admin.dto.response.AdminDto;
 import com.razonapro.razonaprobackend.domain.admin.service.AdminService;
+import com.razonapro.razonaprobackend.infrastructure.security.UserPrincipal;
 import com.razonapro.razonaprobackend.shared.dto.ApiResponse;
 import com.razonapro.razonaprobackend.shared.dto.PagedResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -15,6 +16,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -59,5 +61,12 @@ public class AdminController {
     public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable String id) {
         adminService.deactivate(id);
         return ResponseEntity.ok(ApiResponse.ok("Admin desactivado"));
+    }
+
+    @GetMapping("/me")
+    @Operation(summary = "Perfil del admin autenticado")
+    public ResponseEntity<ApiResponse<AdminDto>> me(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(ApiResponse.ok(adminService.findById(principal.getId())));
     }
 }
