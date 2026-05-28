@@ -15,6 +15,7 @@ public enum ErrorCode {
     INVALID_LOGIN_CODE        ("AUTH-006", HttpStatus.UNAUTHORIZED, "Formato de código inválido"),
     INSUFFICIENT_PERMS        ("AUTH-007", HttpStatus.FORBIDDEN,    "Sin permisos para esta acción"),
     TOO_MANY_REQUESTS         ("AUTH-008", HttpStatus.TOO_MANY_REQUESTS, "Demasiados intentos, espera un momento"),
+    TRIED_NOT_FINISHED ("BIZ-009", HttpStatus.BAD_REQUEST, "El intento no ha sido finalizado"),
 
     // ── Validación ────────────────────────────────────────────────────────
     VALIDATION_FAILED         ("VAL-001",  HttpStatus.BAD_REQUEST,  "Errores de validación"),

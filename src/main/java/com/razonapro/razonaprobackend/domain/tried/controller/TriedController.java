@@ -3,10 +3,12 @@ package com.razonapro.razonaprobackend.domain.tried.controller;
 import com.razonapro.razonaprobackend.domain.tried.dto.request.StartTriedRequest;
 import com.razonapro.razonaprobackend.domain.tried.dto.request.SubmitAnswerRequest;
 import com.razonapro.razonaprobackend.domain.tried.dto.response.TriedDto;
+import com.razonapro.razonaprobackend.domain.tried.dto.response.TriedReviewDto;
 import com.razonapro.razonaprobackend.domain.tried.service.TriedService;
 import com.razonapro.razonaprobackend.infrastructure.security.UserPrincipal;
 import com.razonapro.razonaprobackend.shared.dto.ApiResponse;
 import com.razonapro.razonaprobackend.shared.dto.PagedResponse;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +44,20 @@ public class TriedController {
     public ResponseEntity<ApiResponse<TriedDto>> findById(
             @PathVariable String triedId, @AuthenticationPrincipal UserPrincipal principal) {
         return ResponseEntity.ok(ApiResponse.ok(triedService.findById(triedId, principal)));
+    }
+
+    /**
+     * Review completo de un intento finalizado.
+     * Retorna cada pregunta con opciones, selección del estudiante,
+     * opción correcta y explicación pedagógica.
+     */
+    @GetMapping("/{triedId}/review")
+    @PreAuthorize("hasAnyRole('ADMIN','STUDENT')")
+    @Operation(summary = "Post-test review con feedback completo")
+    public ResponseEntity<ApiResponse<TriedReviewDto>> getReview(
+            @PathVariable String triedId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(ApiResponse.ok(triedService.getReview(triedId, principal)));
     }
 
     @PostMapping("/start")

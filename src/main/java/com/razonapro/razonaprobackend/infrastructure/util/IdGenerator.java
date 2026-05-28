@@ -6,6 +6,9 @@ public final class IdGenerator {
 
     private IdGenerator() {}
 
+    /** Opción centinela "Sin responder" — nunca se muestra al estudiante */
+    public static final String UNANSWERED_OPTION_ID = "OTN000";
+
     public static String adminId(long count)      { return String.format("AMN%03d", count + 1); }
     public static String competenceId(long count) { return String.format("CPE%03d", count + 1); }
     public static String rankingId(long count)    { return String.format("RKG%03d", count + 1); }
