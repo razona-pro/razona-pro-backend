@@ -89,7 +89,7 @@ public class TriedService {
         // Cargar respuestas del estudiante indexadas por questionId
         List<StudentResponse> responses = responseRepository.findByTriedId(triedId);
         Map<String, StudentResponse> responseByQuestion = responses.stream()
-                .filter(r -> !IdGenerator.UNANSWERED_OPTION_ID.equals(r.getOptionId()))
+                .filter(r -> r.getOptionId() != null)
                 .collect(Collectors.toMap(StudentResponse::getQuestionId, r -> r));
 
         // Cargar las preguntas asignadas al test
@@ -197,7 +197,7 @@ public class TriedService {
 
         // Pre-crear StudentResponse con opción centinela OTN000
         for (TestQuestion tq : selected) {
-            ensureUnansweredOption(req.getCompetenceId(), tq.getQuestionId());
+            // QUITA: ensureUnansweredOption(...)
 
             responseRepository.save(StudentResponse.builder()
                     .studentResponseId(IdGenerator.studentResponseId())
@@ -207,7 +207,7 @@ public class TriedService {
                     .studentId(tried.getStudentId())
                     .triedId(tried.getTriedId())
                     .questionId(tq.getQuestionId())
-                    .optionId(IdGenerator.UNANSWERED_OPTION_ID)  // OTN000 centinela
+                    .optionId(null)          // era: IdGenerator.UNANSWERED_OPTION_ID
                     .isCorrect(false)
                     .build());
         }
@@ -262,8 +262,7 @@ public class TriedService {
         responseRepository.save(sr);
 
         // Contar correctas excluyendo la centinela
-        long correct = responseRepository.countByTriedIdAndIsCorrectTrueAndOptionIdNot(
-                triedId, IdGenerator.UNANSWERED_OPTION_ID);
+        long correct = responseRepository.countByTriedIdAndIsCorrectTrueAndOptionIdIsNotNull(triedId);
         tried.setCorrectAnswers((int) correct);
         triedRepository.save(tried);
 
@@ -294,7 +293,7 @@ public class TriedService {
 
         // Solo respuestas reales (no la centinela OTN000)
         List<StudentResponse> responses = responseRepository
-                .findByTriedIdAndOptionIdNot(tried.getTriedId(), IdGenerator.UNANSWERED_OPTION_ID);
+                .findByTriedIdAndOptionIdIsNotNull(tried.getTriedId());
 
         int totalPoints = 0, earnedPoints = 0;
         for (StudentResponse sr : responses) {

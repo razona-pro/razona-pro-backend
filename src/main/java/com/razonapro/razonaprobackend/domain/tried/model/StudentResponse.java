@@ -32,7 +32,7 @@ public class StudentResponse {
     @Column(name = "question_id", length = 7, nullable = false, updatable = false)
     private String questionId;
 
-    @Column(name = "option_id", length = 6, nullable = false)
+    @Column(name = "option_id", length = 6)
     private String optionId;
 
     @Column(name = "is_correct", columnDefinition = "CHAR(1)", nullable = false)
