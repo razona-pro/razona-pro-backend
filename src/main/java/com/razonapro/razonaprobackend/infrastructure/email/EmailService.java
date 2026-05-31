@@ -77,8 +77,9 @@ public class EmailService {
 
     @Async
     public void sendVerificationEmail(String toEmail, String name, String rawToken) {
-        String link = appProperties.getFrontendUrl() + "/verify-email?token=" + rawToken;
-        String body = """
+        try {
+            String link = appProperties.getFrontendUrl() + "/verify-email?token=" + rawToken;
+            String body = """
             <div class="badge">✉ Verificación de correo</div>
             <h2>¡Hola, %s!</h2>
             <p>Gracias por registrarte en <strong>RazonaPro</strong>. 
@@ -88,13 +89,17 @@ public class EmailService {
             <p class="note">⏳ Este enlace expira en <strong>24 horas</strong>. 
             Si no te registraste en RazonaPro, ignora este mensaje.</p>
             """.formatted(capitalize(name), link);
-        send(toEmail, "Verifica tu correo — RazonaPro", baseTemplate("", "", body));
+            send(toEmail, "Verifica tu correo — RazonaPro", baseTemplate("", "", body));
+        } catch (Exception e) {
+            log.error("Error en sendVerificationEmail para {}: {}", toEmail, e.getMessage());
+        }
     }
 
     @Async
     public void sendWelcomeEmail(String toEmail, String name) {
-        String link = appProperties.getFrontendUrl() + "/auth";
-        String body = """
+        try {
+            String link = appProperties.getFrontendUrl() + "/auth";
+            String body = """
             <div class="badge">🎉 ¡Cuenta activada!</div>
             <h2>¡Bienvenido, %s!</h2>
             <p>Tu cuenta en <strong>RazonaPro</strong> está lista. 
@@ -104,13 +109,17 @@ public class EmailService {
             <p>Tienes acceso a simulacros adaptativos, práctica con IA y 
             rankings en tiempo real. ¡Mucho éxito! 🚀</p>
             """.formatted(capitalize(name), link);
-        send(toEmail, "¡Bienvenido a RazonaPro! — Cuenta activada", baseTemplate("", "", body));
+            send(toEmail, "¡Bienvenido a RazonaPro! — Cuenta activada", baseTemplate("", "", body));
+        } catch (Exception e) {
+            log.error("Error en sendWelcomeEmail para {}: {}", toEmail, e.getMessage());
+        }
     }
 
     @Async
     public void sendPasswordResetEmail(String toEmail, String name, String rawToken) {
-        String link = appProperties.getFrontendUrl() + "/reset-password?token=" + rawToken;
-        String body = """
+        try {
+            String link = appProperties.getFrontendUrl() + "/reset-password?token=" + rawToken;
+            String body = """
             <div class="badge">🔐 Restablecer contraseña</div>
             <h2>Hola, %s</h2>
             <p>Recibimos una solicitud para restablecer la contraseña de tu cuenta 
@@ -119,7 +128,10 @@ public class EmailService {
             <p class="note">⏳ Este enlace expira en <strong>15 minutos</strong>. 
             Si no solicitaste esto, ignora este correo; tu contraseña no cambiará.</p>
             """.formatted(capitalize(name), link);
-        send(toEmail, "Restablecer contraseña — RazonaPro", baseTemplate("", "", body));
+            send(toEmail, "Restablecer contraseña — RazonaPro", baseTemplate("", "", body));
+        } catch (Exception e) {
+            log.error("Error en sendPasswordResetEmail para {}: {}", toEmail, e.getMessage());
+        }
     }
 
     private String capitalize(String s) {
@@ -132,26 +144,35 @@ public class EmailService {
         try {
             MimeMessage msg = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(msg, true, "UTF-8");
+
+            helper.setFrom(appProperties.getMailFrom());
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(htmlBody, true);
+
             mailSender.send(msg);
+
             log.info("Email enviado a {}", to);
-        } catch (MessagingException e) {
-            log.error("Error enviando email a {}: {}", to, e.getMessage());
+
+        } catch (Exception e) {
+            log.error("Error enviando email a {}: {}", to, e.getMessage(), e);
         }
     }
 
     @Async
     public void sendNewTestEmail(String toEmail, String name, String testName, String competenceName) {
-        String link = appProperties.getFrontendUrl() + "/tests";
-        String body = """
-        <div class="badge">📝 Nuevo test</div>
-        <h2>¡Hola, %s!</h2>
-        <p>Se publicó un nuevo test en <strong>RazonaPro</strong>:
-        <strong>%s</strong> (%s). Ya puedes practicar.</p>
-        <center><a href="%s" class="btn">Ir a los tests →</a></center>
-        """.formatted(capitalize(name), testName, competenceName, link);
-        send(toEmail, "Nuevo test disponible — RazonaPro", baseTemplate("", "", body));
+        try {
+            String link = appProperties.getFrontendUrl() + "/tests";
+            String body = """
+            <div class="badge">📝 Nuevo test</div>
+            <h2>¡Hola, %s!</h2>
+            <p>Se publicó un nuevo test en <strong>RazonaPro</strong>:
+            <strong>%s</strong> (%s). Ya puedes practicar.</p>
+            <center><a href="%s" class="btn">Ir a los tests →</a></center>
+            """.formatted(capitalize(name), testName, competenceName, link);
+            send(toEmail, "Nuevo test disponible — RazonaPro", baseTemplate("", "", body));
+        } catch (Exception e) {
+            log.error("Error en sendNewTestEmail para {}: {}", toEmail, e.getMessage());
+        }
     }
 }

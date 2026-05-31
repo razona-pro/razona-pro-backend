@@ -54,4 +54,10 @@ public class CompetenceController {
         competenceService.deactivate(id);
         return ResponseEntity.ok(ApiResponse.ok("Competencia desactivada"));
     }
+
+    @PutMapping("/{id}/activate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<CompetenceDto>> activate(@PathVariable String id) {
+        return ResponseEntity.ok(ApiResponse.ok(competenceService.activate(id)));
+    }
 }

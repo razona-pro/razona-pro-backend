@@ -57,4 +57,12 @@ public class CompetenceService {
         c.setIsActive(false);
         competenceRepository.save(c);
     }
+
+    @Transactional
+    public CompetenceDto activate(String id) {
+        Competence c = competenceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Competencia", id));
+        c.setIsActive(true);
+        return CompetenceDto.from(competenceRepository.save(c));
+    }
 }
