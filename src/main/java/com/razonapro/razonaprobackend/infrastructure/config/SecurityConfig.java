@@ -34,6 +34,7 @@ public class SecurityConfig {
             "/api/competences",
             "/api/competences/**",
             "/api/stats/home",
+            "/api/ai-trieds/status",
             "/swagger-ui.html",
             "/swagger-ui/**",
             "/api-docs",

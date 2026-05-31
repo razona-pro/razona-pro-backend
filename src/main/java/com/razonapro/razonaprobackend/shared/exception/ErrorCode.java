@@ -42,7 +42,18 @@ public enum ErrorCode {
 
     // ── Servidor ──────────────────────────────────────────────────────────
     INTERNAL_ERROR            ("SRV-001",  HttpStatus.INTERNAL_SERVER_ERROR, "Error interno del servidor"),
-    EXTERNAL_SERVICE_DOWN     ("SRV-002",  HttpStatus.SERVICE_UNAVAILABLE,   "Servicio externo no disponible");
+    EXTERNAL_SERVICE_DOWN     ("SRV-002",  HttpStatus.SERVICE_UNAVAILABLE,   "Servicio externo no disponible"),
+
+    // Agregar al enum ErrorCode.java (en la sección Negocio):
+
+
+    AI_MODULE_DISABLED    ("BIZ-009", HttpStatus.SERVICE_UNAVAILABLE,    "El módulo de IA no está habilitado. Contacta al administrador."),
+    AI_GENERATION_FAILED  ("BIZ-010", HttpStatus.SERVICE_UNAVAILABLE,    "Error al generar la pregunta con IA. Intenta nuevamente."),
+    AI_SESSION_NOT_FOUND  ("BIZ-011", HttpStatus.NOT_FOUND,              "Sesión de IA no encontrada o expirada. Inicia una nueva práctica."),
+    AI_QUESTION_NOT_MATCH ("BIZ-012", HttpStatus.BAD_REQUEST,            "La pregunta no corresponde a la sesión activa."),
+    AI_ALREADY_ANSWERED   ("BIZ-013", HttpStatus.CONFLICT,               "Esta pregunta ya fue respondida."),
+    AI_INVALID_OPTION     ("BIZ-014", HttpStatus.BAD_REQUEST,            "Opción de respuesta inválida."),
+    AI_TUTOR_DISABLED     ("BIZ-015", HttpStatus.SERVICE_UNAVAILABLE,    "El tutor IA no está disponible actualmente.");
 
     private final String     code;
     private final HttpStatus status;
