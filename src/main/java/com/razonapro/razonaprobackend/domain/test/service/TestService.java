@@ -2,6 +2,7 @@ package com.razonapro.razonaprobackend.domain.test.service;
 
 import com.razonapro.razonaprobackend.domain.admin.repository.AdminRepository;
 import com.razonapro.razonaprobackend.domain.competence.repository.CompetenceRepository;
+import com.razonapro.razonaprobackend.domain.notification.service.NotificationService;
 import com.razonapro.razonaprobackend.domain.question.dto.response.OptionDto;
 import com.razonapro.razonaprobackend.domain.question.dto.response.QuestionDto;
 import com.razonapro.razonaprobackend.domain.question.repository.OptionRepository;
@@ -40,6 +41,7 @@ public class TestService {
     private final OptionRepository       optionRepository;
     private final CompetenceRepository   competenceRepository;
     private final AdminRepository        adminRepository;
+    private final NotificationService notificationService;
 
     @Transactional(readOnly = true)
     public PagedResponse<TestDto> findAll(Pageable pageable, boolean activeOnly) {
@@ -102,6 +104,9 @@ public class TestService {
                 .questionsToPresent(req.getQuestionsToPresent())
                 .testMode(req.getTestMode())
                 .build();
+        notificationService.broadcastNewTest(test.getTestName(),
+                competenceRepository.findById(req.getCompetenceId())
+                        .map(c -> c.getCompetenceName()).orElse(req.getCompetenceId()));
         return TestDto.from(testRepository.save(test));
     }
 

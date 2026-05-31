@@ -1,14 +1,14 @@
-// src/main/java/com/razonapro/razonaprobackend/domain/aitried/dto/response/AiAnswerResultDto.java
+// domain/aitried/dto/response/AiAnswerResultDto.java
 package com.razonapro.razonaprobackend.domain.aitried.dto.response;
 
 public record AiAnswerResultDto(
         boolean isCorrect,
-        String  selectedOptionId,
-        String  correctOptionId,
+        int     selectedIndex,
+        int     correctIndex,
         String  explanation,
         int     correctAnswers,
         int     totalAnswered,
         int     totalQuestions,
         boolean finished,
-        Double  finalScore       // presente solo si finished=true
+        Double  finalScore
 ) {}

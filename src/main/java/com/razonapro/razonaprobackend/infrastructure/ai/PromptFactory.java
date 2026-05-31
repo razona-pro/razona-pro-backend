@@ -2,7 +2,6 @@
 package com.razonapro.razonaprobackend.infrastructure.ai;
 
 import com.razonapro.razonaprobackend.domain.aitried.port.dto.AiHintContext;
-import com.razonapro.razonaprobackend.domain.aitried.port.dto.AiQuestionRequest;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -10,111 +9,76 @@ import java.util.List;
 @Component
 public class PromptFactory {
 
-    // ── SISTEMA base para generación de preguntas ──────────────────────
-
-    public static final String QUESTION_SYSTEM = """
+    public static final String BATCH_SYSTEM = """
         Eres un experto en evaluación educativa del ICFES Colombia, especializado en el examen Saber Pro.
-        Tu tarea es generar preguntas de selección múltiple (una sola respuesta correcta) de alta calidad,
-        alineadas con las competencias genéricas del Saber Pro y el nivel de dificultad solicitado.
-        
-        REGLAS OBLIGATORIAS:
-        1. Responde ÚNICAMENTE con JSON válido, sin texto adicional, sin markdown, sin explicaciones fuera del JSON.
-        2. La pregunta debe ser autosuficiente (no requiere material externo a menos que lo incluyas en el enunciado).
-        3. Las cuatro opciones deben ser plausibles y no "obviamente" incorrectas.
-        4. La opción correcta debe estar bien respaldada por la teoría o el razonamiento explícito.
-        5. El campo "explanation" explica por qué la respuesta correcta es la mejor y por qué las demás son incorrectas.
-        6. Redacta en español neutro, académico, sin regionalismos.
-        7. NO generes preguntas de trivia, opinión o de cultura general sin respaldo académico.
-        8. El enunciado debe tener al menos 30 palabras.
-        
-        ESQUEMA JSON REQUERIDO (devuelve exactamente esto, sin campos extra):
+        Generas preguntas de selección múltiple (UNA sola respuesta correcta), de alta calidad,
+        alineadas a la competencia y nivel de dificultad solicitados.
+
+        REGLAS:
+        1. Responde ÚNICAMENTE con JSON válido. Sin markdown, sin texto fuera del JSON.
+        2. Cada pregunta es autosuficiente.
+        3. Las 4 opciones son plausibles; exactamente UNA correcta.
+        4. "explanation" justifica la correcta y por qué las otras no.
+        5. Español neutro, académico. El enunciado tiene al menos 30 palabras.
+        6. NO repitas ni parafrasees los enunciados a evitar.
+
+        ESQUEMA JSON EXACTO (un objeto con un array "questions"):
         {
-          "statement": "Texto completo del enunciado de la pregunta...",
-          "options": [
-            {"text": "Opción A", "correct": false},
-            {"text": "Opción B", "correct": true},
-            {"text": "Opción C", "correct": false},
-            {"text": "Opción D", "correct": false}
-          ],
-          "explanation": "Explicación pedagógica de por qué B es correcta y las demás no..."
+          "questions": [
+            {
+              "statement": "Enunciado completo...",
+              "options": [
+                {"text": "Opción A", "correct": false},
+                {"text": "Opción B", "correct": true},
+                {"text": "Opción C", "correct": false},
+                {"text": "Opción D", "correct": false}
+              ],
+              "explanation": "Por qué B es correcta y las demás no...",
+              "difficulty": 5
+            }
+          ]
         }
         """;
 
-    // ── SISTEMA base para pistas ────────────────────────────────────────
-
     public static final String HINT_SYSTEM = """
-        Eres un tutor académico experto en el Saber Pro. Tu tarea es proporcionar pistas
-        que ayuden al estudiante a razonar la respuesta SIN revelarla directamente.
-        
-        NIVELES DE PISTA:
-        - Nivel 1: Orientación conceptual. Indica qué concepto o habilidad evalúa la pregunta.
-          NO des ninguna pista sobre cuál opción es correcta.
-        - Nivel 2: Descomposición. Descompón el problema en pasos o señala qué información
-          del enunciado es clave. Aún NO reveles la respuesta.
-        - Nivel 3: Pista fuerte. Señala el razonamiento que lleva a la respuesta sin
-          decir explícitamente cuál letra es correcta. Puedes eliminar opciones obviamente incorrectas.
-        
-        Responde SOLO con el texto de la pista, sin introducción, sin "Pista:", sin comillas.
-        Sé conciso (máximo 4 oraciones) y didáctico.
+        Eres un tutor académico del Saber Pro. Das pistas que ayudan a razonar SIN revelar la respuesta.
+        NIVELES:
+        - Nivel 1: Orientación conceptual. No insinúes la opción correcta.
+        - Nivel 2: Descompón el problema o señala la info clave del enunciado.
+        - Nivel 3: Pista fuerte; razonamiento hacia la respuesta sin decir la letra. Puedes descartar opciones obvias.
+        Responde SOLO el texto de la pista, sin "Pista:", sin comillas. Máximo 4 oraciones.
         """;
 
-    // ── Builders ────────────────────────────────────────────────────────
-
-    public String buildQuestionUserPrompt(AiQuestionRequest req) {
-        String difficultyDesc = mapDifficulty(req.difficultyLevel());
-        String avoidSection = req.statementsToAvoid() != null && !req.statementsToAvoid().isEmpty()
-                ? "\n\nTEMAS/ENUNCIADOS A EVITAR (no repitas ni parafrasees estos):\n"
-                + String.join("\n- ", req.statementsToAvoid().stream()
-                .map(s -> s.length() > 80 ? s.substring(0, 80) + "..." : s)
-                .toList())
-                : "";
-
-        String compDesc = (req.competenceDescription() != null && !req.competenceDescription().isBlank())
-                ? "\nDescripción de la competencia: " + req.competenceDescription()
-                : "";
-
+    /** Prompt para generar el batch completo de N preguntas en una sola llamada. */
+    public String buildBatchPrompt(String competenceName, String competenceDescription,
+                                   int totalQuestions, int baseDifficulty) {
+        String compDesc = (competenceDescription != null && !competenceDescription.isBlank())
+                ? "\nDescripción: " + competenceDescription : "";
         return """
-            Genera una pregunta Saber Pro para la siguiente competencia:
-            
+            Genera EXACTAMENTE %d preguntas Saber Pro para la competencia:
+
             Competencia: %s%s
-            Nivel de dificultad solicitado: %d/10 — %s%s
-            
-            Genera exactamente 4 opciones (una correcta, tres incorrectas pero plausibles).
-            Devuelve el JSON con el esquema indicado.
-            """.formatted(
-                req.competenceName(),
-                compDesc,
-                req.difficultyLevel(),
-                difficultyDesc,
-                avoidSection
-        );
+            Dificultad base sugerida: %d/10 (varía ±2 entre preguntas para progresión natural).
+
+            Devuelve el objeto JSON con el array "questions" de %d elementos, según el esquema indicado.
+            Cada pregunta con 4 opciones (una correcta) y su "difficulty" entre 1 y 10.
+            Asegúrate de que las preguntas NO se repitan entre sí.
+            """.formatted(totalQuestions, competenceName, compDesc, baseDifficulty, totalQuestions);
     }
 
     public String buildHintUserPrompt(AiHintContext ctx) {
         StringBuilder sb = new StringBuilder();
-        sb.append("Competencia evaluada: ").append(ctx.competenceName()).append("\n\n");
-        sb.append("ENUNCIADO DE LA PREGUNTA:\n").append(ctx.questionStatement()).append("\n\n");
-        sb.append("OPCIONES:\n");
+        sb.append("Competencia: ").append(ctx.competenceName()).append("\n\n");
+        sb.append("ENUNCIADO:\n").append(ctx.questionStatement()).append("\n\nOPCIONES:\n");
         List<String> opts = ctx.optionTexts();
-        for (int i = 0; i < opts.size(); i++) {
+        for (int i = 0; i < opts.size(); i++)
             sb.append((char) ('A' + i)).append(") ").append(opts.get(i)).append("\n");
-        }
-        sb.append("\nNivel de pista solicitado: ").append(ctx.hintLevel()).append("\n");
+        sb.append("\nNivel de pista: ").append(ctx.hintLevel()).append("\n");
         sb.append("""
-            
-            [Contexto interno — NO reveles esto al estudiante]:
-            La respuesta correcta es: %s
-            
-            Genera la pista del nivel %d según las instrucciones del sistema.
+
+            [Contexto interno — NO revelar]: La respuesta correcta es: %s
+            Genera la pista del nivel %d.
             """.formatted(ctx.correctOptionText(), ctx.hintLevel()));
         return sb.toString();
-    }
-
-    // ── Helper ────────────────────────────────────────────────────────
-
-    private String mapDifficulty(int level) {
-        if (level <= 3) return "Básico — conceptos directos, aplicación simple";
-        if (level <= 7) return "Intermedio — análisis, comparación, aplicación en contexto";
-        return "Avanzado — inferencia compleja, evaluación crítica, síntesis";
     }
 }

@@ -1,126 +1,145 @@
 # RazonaPro Backend
 
-API REST de la plataforma de preparación académica RazonaPro.
+API REST de la plataforma de preparación Saber Pro — UFPSO.
 
-**Stack** · Spring Boot 4.0.6 · Java 21 · PostgreSQL 18 · JWT (jjwt 0.12) · Lombok · springdoc-openapi 2.8 · Bucket4j (rate limit) · Spring Cache
+**Stack** · Spring Boot 4.0.6 · Java 21 · PostgreSQL 18 · JWT (jjwt 0.12) · Lombok · springdoc-openapi 2.8 · Bucket4j · Spring Cache
 
 ---
 
 ## Arquitectura
 
-Domain-Driven package structure con hexagonal en el módulo `aitried`.
+DDD por paquetes; arquitectura hexagonal en el módulo `aitried` (puertos y adaptadores).
 
-```
+```text
 com.razonapro.razonaprobackend/
-├── RazonaProBackendApplication
 ├── infrastructure/
-│   ├── config/        AppProperties, AiModelProperties, CorsConfig,
-│   │                  SecurityConfig, OpenApiConfig, DataInitializer,
-│   │                  ApplicationStartupLogger
-│   ├── security/      JwtService, JwtAuthenticationFilter,
-│   │                  AuthRateLimitFilter, UserPrincipal
-│   ├── email/         EmailService
-│   ├── util/          BooleanToYNConverter, IdGenerator, TokenHashUtil
-│   ├── jobs/          TokenCleanupJob (@Scheduled)
-│   └── health/        HealthController
-├── shared/
-│   ├── dto/           ApiResponse, PagedResponse
-│   ├── exception/     ErrorCode, ApiException, ResourceNotFoundException,
-│   │                  GlobalExceptionHandler
-│   ├── ids/           StudentId, QuestionId, OptionId, TestPK, TriedId,
-│   │                  AiTriedId, AiTriedResponseId
-│   ├── jpa/           Normalizable, NormalizingEntityListener
-│   └── util/          StringNormalizer
+│   ├── ai/            # ChatClient (puerto), CloudChatClient, OllamaChatClient,
+│   │                  # PromptFactory, AiUnavailableException
+│   ├── config/        # AppProperties, AiModelProperties, Cors, Security,
+│   │                  # OpenApi, Jackson, DataInitializer, StartupLogger
+│   ├── security/      # JwtService, JwtAuthenticationFilter, RateLimit, UserPrincipal
+│   ├── email/         # EmailService
+│   ├── util/          # IdGenerator, TokenHashUtil, BooleanToYNConverter
+│   └── jobs/          # TokenCleanupJob
+│
+├── shared/            # dto · exception · ids · jpa · util
+│
 └── domain/
-    ├── auth/          login / register / forgot / reset (unificados)
-    ├── admin/         CRUD admins
-    ├── student/       CRUD estudiantes + /me
-    ├── program/       CRUD programas
-    ├── competence/    CRUD competencias
-    ├── question/      preguntas + opciones
-    ├── test/          tests + asignación de preguntas
-    ├── tried/         intentos de tests
-    ├── ranking/       rankings + leaderboards
-    ├── stats/         /stats/home (público) para métricas del landing
-    └── aitried/
-        ├── port/      AiQuestionGenerator (puerto hexagonal)
-        └── adapter/   NoOp · HuggingFace · Local
+    ├── auth/
+    ├── admin/
+    ├── student/
+    ├── program/
+    ├── competence/
+    ├── question/
+    ├── test/
+    ├── tried/
+    ├── ranking/
+    ├── stats/
+    │
+    ├── aitried/       # IA generativa (práctica en tanda + pistas)
+    │   ├── port/      # AiQuestionGenerator · AiTutor · dto
+    │   ├── adapter/   # AiBatchGenerator · DefaultTutor
+    │   ├── model/     # AiTried · AiTriedResponse · AiQuestion
+    │   └── service/   # AiTriedService
+    │
+    ├── notification/  # Notificaciones in-app + email masivo
+    └── doubt/         # Reportes de duda sobre preguntas
 ```
 
 ---
 
-## Endpoints principales
+## Módulo de IA
+
+`ChatClient` es un puerto con dos implementaciones intercambiables por `AI_MODEL_PROVIDER`:
+
+| Provider | Cliente            | Uso                                 |
+|----------|--------------------|-------------------------------------|
+| `CLOUD`  | `CloudChatClient`  | Groq / OpenAI / OpenRouter (OpenAI) |
+| `OLLAMA` | `OllamaChatClient` | Modelo local                        |
+| `NONE`   | —                  | IA deshabilitada                    |
+
+**Flujo de práctica (batch):**
+1. `POST /api/ai-trieds/start` — genera **todas** las preguntas en una sola llamada, las persiste en `ai_questions` y devuelve la primera.
+2. `GET /api/ai-trieds/{id}/questions` — lista todas (sin revelar la correcta).
+3. `POST /api/ai-trieds/{id}/answer` — evalúa en servidor; escribe en `ai_tried_responses` (dispara triggers de `correct_answers`/score).
+4. `POST /api/ai-trieds/{id}/hint` — pista nivel 1-3, progresiva, tope 3 (`hints_used` persistido).
+5. `GET /api/ai-trieds/{id}/review` — historial con respuestas y explicaciones.
+6. `PUT /api/ai-trieds/{id}/finish` — cierra y calcula puntaje.
+
+La corrección **nunca** la decide el cliente: solo envía `selectedIndex`.
+
+---
+
+## Endpoints
 
 ### Auth (público)
-| Método | Ruta                              | Descripción                                   |
-|--------|-----------------------------------|-----------------------------------------------|
-| POST   | `/api/auth/login`                 | Login unificado admin/estudiante              |
-| POST   | `/api/auth/register`              | Registro de estudiante                        |
-| GET    | `/api/auth/verify-email?token=`   | Verificación de email                         |
-| POST   | `/api/auth/forgot-password`       | Recuperación unificada (email + code + phone) |
-| POST   | `/api/auth/reset-password`        | Aplicar nueva contraseña                      |
+`POST /api/auth/login` · `/register` · `GET /verify-email` · `POST /forgot-password` · `/reset-password`
 
 ### Stats (público)
-| Método | Ruta                | Descripción                            |
-|--------|---------------------|----------------------------------------|
-| GET    | `/api/stats/home`   | Métricas agregadas para el landing     |
+`GET /api/stats/home`
 
-### Admin (rol ADMIN)
-- `/api/admins` — CRUD de administradores (un admin puede crear otros)
-- `/api/students` — gestión de estudiantes
-- `/api/programs` — programas
-- `/api/competences` — competencias
-- `/api/competences/{id}/questions` — banco de preguntas
-- `/api/tests` — tests y asignación de preguntas
-- `/api/rankings` — rankings
+### Admin (ADMIN)
+`/api/admins` · `/api/students` · `/api/programs` · `/api/competences` · `/api/competences/{id}/questions` · `/api/tests` · `/api/rankings` · `/api/doubts`
 
-### Student (rol STUDENT)
-- `/api/students/me` — perfil propio
-- `/api/trieds/my`, `/start`, `/{id}/answer`, `/{id}/finish` — intentos de tests
-- `/api/ai-trieds/*` — sesiones con IA
+### Student (STUDENT)
+`/api/students/me` · `/api/trieds/*` · `/api/ai-trieds/*` · `/api/notifications/*` · `POST /api/doubts`
 
----
+### IA
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET  | `/api/ai-trieds/status`            | Estado del proveedor IA (público) |
+| POST | `/api/ai-trieds/start`             | Inicia práctica (genera batch) |
+| GET  | `/api/ai-trieds/my`                | Historial de prácticas |
+| GET  | `/api/ai-trieds/{id}/questions`    | Preguntas del intento |
+| GET  | `/api/ai-trieds/{id}/review`       | Review con explicaciones |
+| POST | `/api/ai-trieds/{id}/answer`       | Responder (evalúa servidor) |
+| POST | `/api/ai-trieds/{id}/hint`         | Pista (1-3) |
+| PUT  | `/api/ai-trieds/{id}/finish`       | Finalizar |
+| GET  | `/api/ai-hint`                     | Pista para banco estático |
 
-## Códigos de error
+### Notificaciones (STUDENT/ADMIN)
+`GET /api/notifications` · `GET /unread-count` · `PUT /read-all` · `PUT /{id}/read`
 
-Toda respuesta de error: `{ success: false, code: "XXX-NNN", message: "..." }`.
-
-| Prefijo | Familia                |
-|---------|------------------------|
-| AUTH-   | Autenticación          |
-| VAL-    | Validación             |
-| RES-    | Recurso no encontrado  |
-| CFL-    | Conflicto / duplicado  |
-| BIZ-    | Regla de negocio       |
-| SRV-    | Error servidor         |
-
-Listado completo: `shared/exception/ErrorCode.java`.
+### Dudas
+`POST /api/doubts` (STUDENT) · `GET /api/doubts?status=` (ADMIN) · `PUT /{id}/status` (ADMIN)
 
 ---
 
-## Transfer Learning
+## Notificaciones
 
-`AiQuestionGenerator` es un **puerto** (hexagonal) con tres implementaciones intercambiables vía `AI_MODEL_PROVIDER`:
-
-| Provider     | Adapter                          | Estado                  |
-|--------------|----------------------------------|-------------------------|
-| `NONE`       | `NoOpAiQuestionGenerator`        | Default, deshabilitado  |
-| `HUGGINGFACE`| `HuggingFaceQuestionGenerator`   | Esqueleto listo         |
-| `LOCAL`      | `LocalModelQuestionGenerator`    | Esqueleto listo         |
-
-Para activar: setear `AI_MODEL_ENABLED=true` + `AI_MODEL_PROVIDER=...` + credenciales del proveedor. La inyección se resuelve por `@ConditionalOnProperty` sin tocar código del service.
+- **Nuevo test** → al crear un test, broadcast `@Async` a todos los estudiantes activos (in-app + email).
+- **Duda reportada** → notifica in-app a todos los admins activos.
+- In-app persistidas en `notifications`; correos vía `EmailService`.
 
 ---
 
 ## Convenciones
 
-- **Datos en mayúscula** en DB; normalización automática en `@PrePersist`/`@PreUpdate` vía `NormalizingEntityListener`. Los services no normalizan manualmente.
-- **IDs string con prefijo**: `AMN001` admin, `CPE001` competence, `QTN0001` question, `OTN001` option, `TET00001` test, `RKG001` ranking, `TRD<7random>` tried.
-- **Boolean → CHAR(1) Y/N** vía `BooleanToYNConverter(autoApply=true)`.
-- **JWT** solo para acceso (admin/student). Verificación de email y reset de contraseña usan **tokens opacos** UUID + SHA-256 persistidos en `student_tokens` / `admin_tokens`.
-- **Schema parametrizable** vía `DB_SCHEMA`. Ninguna entidad hardcodea schema en `@Table`.
-- **Rate limit** en `/api/auth/**` (10 req/min por IP, Bucket4j).
-- **Limpieza automática** de tokens expirados (`TokenCleanupJob`, cron diario 3 AM).
+- Datos en MAYÚSCULA en BD; normalización en `@PrePersist`/`@PreUpdate`.
+- IDs con prefijo: `AMN` admin, `CPE` competence, `QTN` question, `TET` test, `ATD` ai_tried, `ATE` ai_tried_response, `AQN` ai_question, `NOT` notificación, `DBT` duda.
+- Boolean → `CHAR(1)` Y/N (`BooleanToYNConverter`).
+- `ddl-auto=none`: el esquema lo gestiona el repo de BD. Aplicar `migration.sql` antes de levantar con el módulo IA.
+- Errores: `{ success:false, code:"XXX-NNN", message }`. Familias en `ErrorCode.java`.
+
+---
+
+## Puesta en marcha
+
+```bash
+# 1. Base de datos (esquema completo)
+psql -U postgres -d postgres -f setup.sql
+# 1b. Migración módulo IA (si la BD ya existía)
+psql -U postgres -d postgres -f migration.sql
+
+# 2. Variables: copia y completa .env (define AI_CLOUD_API_KEY)
+
+# 3. Arrancar
+./mvnw spring-boot:run
+```
+
+- Swagger: `http://localhost:8080/swagger-ui.html`
+- Health: `http://localhost:8080/api/health`
+- Estado IA: `http://localhost:8080/api/ai-trieds/status`
 
 ---
 
@@ -129,11 +148,3 @@ Para activar: setear `AI_MODEL_ENABLED=true` + `AI_MODEL_PROVIDER=...` + credenc
 ```bash
 ./mvnw test
 ```
-
----
-
-## URLs útiles (desarrollo)
-
-- Swagger: `${FRONTEND_URL}` no aplica — Swagger corre en el backend en `http://<host>:${SERVER_PORT}/swagger-ui.html`
-- Health: `/api/health`
-- Home stats: `/api/stats/home`

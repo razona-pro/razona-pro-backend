@@ -21,6 +21,15 @@ public final class IdGenerator {
     public static String aiTriedId()         { return "ATD" + uuid7(); }
     public static String aiTriedResponseId() { return "ATE" + uuid7(); }
 
+    // Añadir dentro de la clase IdGenerator (junto a los existentes)
+    public static String aiQuestionId()   { return "AQN" + uuid9(); }
+    public static String notificationId() { return "NOT" + uuid9(); }
+    public static String doubtId()        { return "DBT" + uuid9(); }
+
+    private static String uuid9() {
+        return UUID.randomUUID().toString().replace("-", "").substring(0, 9).toUpperCase();
+    }
+
     private static String uuid7() {
         return UUID.randomUUID().toString().replace("-", "").substring(0, 7).toUpperCase();
     }

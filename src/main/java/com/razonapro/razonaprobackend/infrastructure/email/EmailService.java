@@ -141,4 +141,17 @@ public class EmailService {
             log.error("Error enviando email a {}: {}", to, e.getMessage());
         }
     }
+
+    @Async
+    public void sendNewTestEmail(String toEmail, String name, String testName, String competenceName) {
+        String link = appProperties.getFrontendUrl() + "/tests";
+        String body = """
+        <div class="badge">📝 Nuevo test</div>
+        <h2>¡Hola, %s!</h2>
+        <p>Se publicó un nuevo test en <strong>RazonaPro</strong>:
+        <strong>%s</strong> (%s). Ya puedes practicar.</p>
+        <center><a href="%s" class="btn">Ir a los tests →</a></center>
+        """.formatted(capitalize(name), testName, competenceName, link);
+        send(toEmail, "Nuevo test disponible — RazonaPro", baseTemplate("", "", body));
+    }
 }

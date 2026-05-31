@@ -4,6 +4,7 @@ import com.razonapro.razonaprobackend.domain.student.model.Student;
 import com.razonapro.razonaprobackend.shared.ids.StudentId;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
+import java.util.List;
 
 import java.util.Optional;
 
@@ -18,4 +19,5 @@ public interface StudentRepository extends JpaRepository<Student, StudentId> {
     boolean existsByPhone(String phone);
 
     long countByIsActiveTrue();
+    List<Student> findByIsActiveTrue();
 }

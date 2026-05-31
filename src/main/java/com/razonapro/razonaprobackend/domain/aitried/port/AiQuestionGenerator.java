@@ -2,9 +2,11 @@
 package com.razonapro.razonaprobackend.domain.aitried.port;
 
 import com.razonapro.razonaprobackend.domain.aitried.port.dto.AiGeneratedQuestion;
-import com.razonapro.razonaprobackend.domain.aitried.port.dto.AiQuestionRequest;
+import java.util.List;
 
 public interface AiQuestionGenerator {
-    AiGeneratedQuestion generate(AiQuestionRequest request);
+    /** Genera todas las preguntas del intento en una sola llamada. */
+    List<AiGeneratedQuestion> generateBatch(String competenceName, String competenceDescription,
+                                            int totalQuestions, int baseDifficulty);
     boolean isAvailable();
 }

@@ -52,4 +52,11 @@ public class AiTried {
 
     @Column(name = "description", length = 200)
     private String description;
+
+    @Column(name = "competence_id", length = 6)
+    private String competenceId;
+
+    @Column(name = "theta", precision = 5, scale = 3)
+    @Builder.Default
+    private java.math.BigDecimal theta = java.math.BigDecimal.ZERO;
 }

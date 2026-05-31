@@ -53,7 +53,12 @@ public enum ErrorCode {
     AI_QUESTION_NOT_MATCH ("BIZ-012", HttpStatus.BAD_REQUEST,            "La pregunta no corresponde a la sesión activa."),
     AI_ALREADY_ANSWERED   ("BIZ-013", HttpStatus.CONFLICT,               "Esta pregunta ya fue respondida."),
     AI_INVALID_OPTION     ("BIZ-014", HttpStatus.BAD_REQUEST,            "Opción de respuesta inválida."),
-    AI_TUTOR_DISABLED     ("BIZ-015", HttpStatus.SERVICE_UNAVAILABLE,    "El tutor IA no está disponible actualmente.");
+    AI_TUTOR_DISABLED     ("BIZ-015", HttpStatus.SERVICE_UNAVAILABLE,    "El tutor IA no está disponible actualmente."),
+    AI_BATCH_EMPTY        ("BIZ-016", HttpStatus.SERVICE_UNAVAILABLE, "La IA no devolvió preguntas válidas. Intenta de nuevo."),
+    AI_QUESTION_NOT_FOUND ("BIZ-017", HttpStatus.NOT_FOUND,           "Pregunta IA no encontrada en esta sesión."),
+    HINT_LIMIT_REACHED    ("BIZ-018", HttpStatus.CONFLICT,            "Ya alcanzaste el máximo de pistas para esta pregunta."),
+    DOUBT_NOT_FOUND       ("BIZ-019", HttpStatus.NOT_FOUND,          "Reporte de duda no encontrado."),
+    NOTIFICATION_NOT_FOUND("BIZ-020", HttpStatus.NOT_FOUND,          "Notificación no encontrada.");
 
     private final String     code;
     private final HttpStatus status;

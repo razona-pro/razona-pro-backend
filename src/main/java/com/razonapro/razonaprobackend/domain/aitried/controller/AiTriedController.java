@@ -1,4 +1,4 @@
-// src/main/java/com/razonapro/razonaprobackend/domain/aitried/controller/AiTriedController.java
+// domain/aitried/controller/AiTriedController.java
 package com.razonapro.razonaprobackend.domain.aitried.controller;
 
 import com.razonapro.razonaprobackend.domain.aitried.dto.request.AiHintRequest;
@@ -21,90 +21,84 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/ai-trieds")
 @RequiredArgsConstructor
 @PreAuthorize("hasAnyRole('STUDENT','ADMIN')")
-@Tag(name = "AI Trieds", description = "Sesiones de práctica adaptativa con IA")
+@Tag(name = "AI Trieds", description = "Práctica IA en tanda")
 public class AiTriedController {
 
-    private final AiTriedService aiTriedService;
+    private final AiTriedService service;
 
     @GetMapping("/status")
-    @Operation(summary = "Estado del módulo de IA")
     public ResponseEntity<ApiResponse<AiStatusDto>> status() {
-        return ResponseEntity.ok(ApiResponse.ok(aiTriedService.getStatus()));
+        return ResponseEntity.ok(ApiResponse.ok(service.getStatus()));
     }
 
     @GetMapping("/my")
     @PreAuthorize("hasRole('STUDENT')")
-    @Operation(summary = "Historial de sesiones IA del estudiante")
     public ResponseEntity<ApiResponse<PagedResponse<AiTriedDto>>> findMy(
-            @AuthenticationPrincipal UserPrincipal principal,
+            @AuthenticationPrincipal UserPrincipal p,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        return ResponseEntity.ok(ApiResponse.ok(aiTriedService.findMy(principal,
+        return ResponseEntity.ok(ApiResponse.ok(service.findMy(p,
                 PageRequest.of(page, size, Sort.by("attemptTimestamp").descending()))));
     }
 
     @GetMapping("/{aiTriedId}")
-    @Operation(summary = "Detalle de una sesión IA")
     public ResponseEntity<ApiResponse<AiTriedDto>> findById(
-            @PathVariable String aiTriedId,
-            @AuthenticationPrincipal UserPrincipal principal) {
-        return ResponseEntity.ok(ApiResponse.ok(aiTriedService.findById(aiTriedId, principal)));
+            @PathVariable String aiTriedId, @AuthenticationPrincipal UserPrincipal p) {
+        return ResponseEntity.ok(ApiResponse.ok(service.findById(aiTriedId, p)));
+    }
+
+    @GetMapping("/{aiTriedId}/questions")
+    @Operation(summary = "Lista todas las preguntas del intento (sin revelar correcta si no respondida)")
+    public ResponseEntity<ApiResponse<List<AiQuestionDto>>> listQuestions(
+            @PathVariable String aiTriedId, @AuthenticationPrincipal UserPrincipal p) {
+        return ResponseEntity.ok(ApiResponse.ok(service.listQuestions(aiTriedId, p)));
+    }
+
+    @GetMapping("/{aiTriedId}/review")
+    @Operation(summary = "Historial detallado con respuestas y explicaciones")
+    public ResponseEntity<ApiResponse<List<AiQuestionDto>>> review(
+            @PathVariable String aiTriedId, @AuthenticationPrincipal UserPrincipal p) {
+        return ResponseEntity.ok(ApiResponse.ok(service.getReview(aiTriedId, p)));
     }
 
     @PostMapping("/start")
     @PreAuthorize("hasRole('STUDENT')")
-    @Operation(summary = "Iniciar sesión adaptativa con IA — genera la primera pregunta")
+    @Operation(summary = "Inicia práctica: genera TODAS las preguntas y devuelve la primera")
     public ResponseEntity<ApiResponse<AiStartResponseDto>> start(
-            @Valid @RequestBody StartAiTriedRequest req,
-            @AuthenticationPrincipal UserPrincipal principal) {
+            @Valid @RequestBody StartAiTriedRequest req, @AuthenticationPrincipal UserPrincipal p) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.ok("Sesión IA iniciada", aiTriedService.start(req, principal)));
-    }
-
-    @GetMapping("/{aiTriedId}/next")
-    @PreAuthorize("hasRole('STUDENT')")
-    @Operation(summary = "Obtener la siguiente pregunta generada por IA")
-    public ResponseEntity<ApiResponse<AiQuestionDto>> nextQuestion(
-            @PathVariable String aiTriedId,
-            @AuthenticationPrincipal UserPrincipal principal) {
-        return ResponseEntity.ok(ApiResponse.ok(
-                aiTriedService.nextQuestion(aiTriedId, principal)));
+                .body(ApiResponse.ok("Práctica IA iniciada", service.start(req, p)));
     }
 
     @PostMapping("/{aiTriedId}/answer")
     @PreAuthorize("hasRole('STUDENT')")
-    @Operation(summary = "Enviar respuesta — el servidor evalúa y adapta la dificultad")
-    public ResponseEntity<ApiResponse<AiAnswerResultDto>> submitAnswer(
-            @PathVariable String aiTriedId,
-            @Valid @RequestBody SubmitAiAnswerRequest req,
-            @AuthenticationPrincipal UserPrincipal principal) {
-        return ResponseEntity.ok(ApiResponse.ok(
-                aiTriedService.submitAnswer(aiTriedId, req, principal)));
+    public ResponseEntity<ApiResponse<AiAnswerResultDto>> answer(
+            @PathVariable String aiTriedId, @Valid @RequestBody SubmitAiAnswerRequest req,
+            @AuthenticationPrincipal UserPrincipal p) {
+        return ResponseEntity.ok(ApiResponse.ok(service.submitAnswer(aiTriedId, req, p)));
     }
 
     @PostMapping("/{aiTriedId}/hint")
     @PreAuthorize("hasRole('STUDENT')")
-    @Operation(summary = "Solicitar pista (nivel 1, 2 o 3)")
-    public ResponseEntity<ApiResponse<AiHintDto>> getHint(
-            @PathVariable String aiTriedId,
-            @Valid @RequestBody AiHintRequest req,
-            @AuthenticationPrincipal UserPrincipal principal) {
-        return ResponseEntity.ok(ApiResponse.ok(
-                aiTriedService.getHint(aiTriedId, req, principal)));
+    public ResponseEntity<ApiResponse<AiHintDto>> hint(
+            @PathVariable String aiTriedId, @Valid @RequestBody AiHintRequest req,
+            @AuthenticationPrincipal UserPrincipal p) {
+        return ResponseEntity.ok(ApiResponse.ok(service.getHint(aiTriedId, req, p)));
     }
 
     @PutMapping("/{aiTriedId}/finish")
     @PreAuthorize("hasRole('STUDENT')")
-    @Operation(summary = "Finalizar sesión manualmente")
     public ResponseEntity<ApiResponse<AiTriedDto>> finish(
             @PathVariable String aiTriedId,
             @RequestParam(required = false) Integer timeSpentSeconds,
-            @AuthenticationPrincipal UserPrincipal principal) {
-        return ResponseEntity.ok(ApiResponse.ok("Sesión AI finalizada",
-                aiTriedService.finish(aiTriedId, timeSpentSeconds, principal)));
+            @AuthenticationPrincipal UserPrincipal p) {
+        return ResponseEntity.ok(ApiResponse.ok("Práctica finalizada",
+                service.finish(aiTriedId, timeSpentSeconds, p)));
     }
 }
