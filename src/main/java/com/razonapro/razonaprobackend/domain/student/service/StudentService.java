@@ -18,6 +18,18 @@ public class StudentService {
 
     private final StudentRepository studentRepository;
 
+    public PagedResponse<StudentDto> findAll(
+            String search, String programId, String status, Pageable pageable) {
+        String q  = (search    != null && !search.isBlank())    ? search.trim()    : null;
+        String p  = (programId != null && !programId.isBlank()) ? programId.trim() : null;
+        String sf = (status    != null && !status.isBlank())    ? status.trim()    : "";
+
+        if (q == null && p == null && sf.isEmpty()) {
+            return PagedResponse.from(studentRepository.findAll(pageable).map(StudentDto::from));
+        }
+        return PagedResponse.from(studentRepository.findByFilters(q, p, sf, pageable).map(StudentDto::from));
+    }
+
     public PagedResponse<StudentDto> findAll(Pageable pageable) {
         return PagedResponse.from(studentRepository.findAll(pageable).map(StudentDto::from));
     }

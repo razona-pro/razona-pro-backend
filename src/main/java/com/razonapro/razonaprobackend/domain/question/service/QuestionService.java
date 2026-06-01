@@ -3,6 +3,7 @@ package com.razonapro.razonaprobackend.domain.question.service;
 import com.razonapro.razonaprobackend.domain.admin.repository.AdminRepository;
 import com.razonapro.razonaprobackend.domain.competence.repository.CompetenceRepository;
 import com.razonapro.razonaprobackend.domain.question.dto.request.QuestionRequest;
+import com.razonapro.razonaprobackend.domain.question.dto.request.QuestionUpdateRequest;
 import com.razonapro.razonaprobackend.domain.question.dto.response.QuestionDto;
 import com.razonapro.razonaprobackend.domain.question.model.Option;
 import com.razonapro.razonaprobackend.domain.question.model.Question;
@@ -33,6 +34,23 @@ public class QuestionService {
 
     public PagedResponse<QuestionDto> findByCompetence(String competenceId, Pageable pageable) {
         return PagedResponse.from(questionRepository.findByCompetenceId(competenceId, pageable)
+                .map(q -> QuestionDto.from(q,
+                        optionRepository.findByCompetenceIdAndQuestionId(q.getCompetenceId(), q.getQuestionId()))));
+    }
+
+    public PagedResponse<QuestionDto> findByFilters(
+            String competenceId, String difficulty, String status, String search, Pageable pageable) {
+        String comp = (competenceId != null && !competenceId.isBlank()) ? competenceId : null;
+        String diff = (difficulty   != null && !difficulty.isBlank())   ? difficulty   : null;
+        String srch = (search       != null && !search.isBlank())       ? search       : null;
+        String sf   = (status       != null && !status.isBlank())       ? status.trim(): "";
+
+        if (comp == null && diff == null && srch == null && sf.isEmpty()) {
+            return PagedResponse.from(questionRepository.findAll(pageable)
+                    .map(q -> QuestionDto.from(q,
+                            optionRepository.findByCompetenceIdAndQuestionId(q.getCompetenceId(), q.getQuestionId()))));
+        }
+        return PagedResponse.from(questionRepository.findByFilters(comp, diff, srch, sf, pageable)
                 .map(q -> QuestionDto.from(q,
                         optionRepository.findByCompetenceIdAndQuestionId(q.getCompetenceId(), q.getQuestionId()))));
     }
@@ -80,6 +98,26 @@ public class QuestionService {
 
         return QuestionDto.from(question,
                 optionRepository.findByCompetenceIdAndQuestionId(competenceId, questionId));
+    }
+
+    @Transactional
+    public QuestionDto update(String competenceId, String questionId, QuestionUpdateRequest req) {
+        Question q = questionRepository.findById(new QuestionId(competenceId, questionId))
+                .orElseThrow(() -> new ResourceNotFoundException("Pregunta", questionId));
+        if (req.getStatement()     != null) q.setStatement(req.getStatement());
+        if (req.getDifficultyLevel()!= null) q.setDifficultyLevel(req.getDifficultyLevel());
+        if (req.getSource()        != null) q.setSource(req.getSource());
+        if (req.getExplanation()   != null) q.setExplanation(req.getExplanation());
+        questionRepository.save(q);
+        return QuestionDto.from(q, optionRepository.findByCompetenceIdAndQuestionId(competenceId, questionId));
+    }
+
+    @Transactional
+    public void activate(String competenceId, String questionId) {
+        Question q = questionRepository.findById(new QuestionId(competenceId, questionId))
+                .orElseThrow(() -> new ResourceNotFoundException("Pregunta", questionId));
+        q.setIsActive(true);
+        questionRepository.save(q);
     }
 
     @Transactional

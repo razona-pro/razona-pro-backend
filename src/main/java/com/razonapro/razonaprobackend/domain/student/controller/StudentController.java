@@ -40,12 +40,16 @@ public class StudentController {
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Listar todos los estudiantes (Admin)")
+    @Operation(summary = "Listar estudiantes con filtros opcionales (Admin)")
     public ResponseEntity<ApiResponse<PagedResponse<StudentDto>>> findAll(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "0")  int    page,
+            @RequestParam(defaultValue = "20") int    size,
+            @RequestParam(required = false)    String search,
+            @RequestParam(required = false)    String programId,
+            @RequestParam(required = false)    String status) {
         return ResponseEntity.ok(ApiResponse.ok(
-                studentService.findAll(PageRequest.of(page, size, Sort.by("createdAt").descending()))));
+                studentService.findAll(search, programId, status,
+                        PageRequest.of(page, size, Sort.by("createdAt").descending()))));
     }
 
     @GetMapping("/{studentId}")

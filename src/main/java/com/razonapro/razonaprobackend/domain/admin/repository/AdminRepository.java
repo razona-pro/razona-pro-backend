@@ -12,4 +12,23 @@ public interface AdminRepository extends JpaRepository<Admin, String> {
     boolean existsByEmail(String email);
     boolean existsByPhone(String phone);
     long countByIsActiveTrue();
+    long countByIsActiveFalse();
+
+    @org.springframework.data.jpa.repository.Query("""
+        SELECT a FROM Admin a
+        WHERE (:search IS NULL OR
+               LOWER(a.adminId)      LIKE LOWER(CONCAT('%',:search,'%')) OR
+               LOWER(a.firstName)    LIKE LOWER(CONCAT('%',:search,'%')) OR
+               LOWER(a.firstSurname) LIKE LOWER(CONCAT('%',:search,'%')) OR
+               LOWER(a.email)        LIKE LOWER(CONCAT('%',:search,'%')))
+          AND (:statusFilter = '' OR
+               (:statusFilter = 'active'   AND a.isActive = true)  OR
+               (:statusFilter = 'inactive' AND a.isActive = false))
+        ORDER BY a.createdAt DESC
+    """)
+    org.springframework.data.domain.Page<Admin> findByFilters(
+        @org.springframework.data.repository.query.Param("search")       String search,
+        @org.springframework.data.repository.query.Param("statusFilter") String statusFilter,
+        org.springframework.data.domain.Pageable pageable
+    );
 }

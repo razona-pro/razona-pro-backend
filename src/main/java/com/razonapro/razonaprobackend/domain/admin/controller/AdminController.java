@@ -29,12 +29,15 @@ public class AdminController {
     private final AdminService adminService;
 
     @GetMapping
-    @Operation(summary = "Listar administradores")
+    @Operation(summary = "Listar administradores con filtros opcionales")
     public ResponseEntity<ApiResponse<PagedResponse<AdminDto>>> findAll(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "0")  int    page,
+            @RequestParam(defaultValue = "20") int    size,
+            @RequestParam(required = false)    String search,
+            @RequestParam(required = false)    String status) {
         return ResponseEntity.ok(ApiResponse.ok(
-                adminService.findAll(PageRequest.of(page, size, Sort.by("createdAt").descending()))));
+                adminService.findAll(search, status,
+                        PageRequest.of(page, size, Sort.by("createdAt").descending()))));
     }
 
     @GetMapping("/{id}")

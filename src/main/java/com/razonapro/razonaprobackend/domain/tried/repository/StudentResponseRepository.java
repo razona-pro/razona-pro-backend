@@ -20,4 +20,27 @@ public interface StudentResponseRepository extends JpaRepository<StudentResponse
 
     // findByTriedId sigue igual
     List<StudentResponse> findByTriedId(String triedId);
+
+    @org.springframework.data.jpa.repository.Query("""
+        SELECT sr.questionId,
+               COUNT(sr) as totalAnswers,
+               SUM(CASE WHEN sr.isCorrect = true THEN 1 ELSE 0 END) as correctAnswers
+        FROM StudentResponse sr
+        WHERE sr.competenceId = :competenceId AND sr.optionId IS NOT NULL
+        GROUP BY sr.questionId
+        ORDER BY correctAnswers ASC
+    """)
+    List<Object[]> findQuestionTrendsByCompetence(@org.springframework.data.repository.query.Param("competenceId") String competenceId);
+
+    @org.springframework.data.jpa.repository.Query("""
+        SELECT sr.competenceId,
+               sr.questionId,
+               COUNT(sr) as totalAnswers,
+               SUM(CASE WHEN sr.isCorrect = true THEN 1 ELSE 0 END) as correctAnswers
+        FROM StudentResponse sr
+        WHERE sr.optionId IS NOT NULL
+        GROUP BY sr.competenceId, sr.questionId
+        ORDER BY totalAnswers DESC
+    """)
+    List<Object[]> findQuestionTrendsAll();
 }

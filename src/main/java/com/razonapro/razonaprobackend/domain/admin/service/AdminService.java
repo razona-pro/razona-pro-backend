@@ -24,6 +24,16 @@ public class AdminService {
     private final AdminRepository adminRepository;
     private final PasswordEncoder passwordEncoder;
 
+    public PagedResponse<AdminDto> findAll(String search, String status, Pageable pageable) {
+        String q  = (search != null && !search.isBlank()) ? search.trim() : null;
+        String sf = (status != null && !status.isBlank()) ? status.trim() : "";
+
+        if (q == null && sf.isEmpty()) {
+            return PagedResponse.from(adminRepository.findAll(pageable).map(AdminDto::from));
+        }
+        return PagedResponse.from(adminRepository.findByFilters(q, sf, pageable).map(AdminDto::from));
+    }
+
     public PagedResponse<AdminDto> findAll(Pageable pageable) {
         return PagedResponse.from(adminRepository.findAll(pageable).map(AdminDto::from));
     }

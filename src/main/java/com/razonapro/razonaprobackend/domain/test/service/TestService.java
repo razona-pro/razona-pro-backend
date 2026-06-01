@@ -31,7 +31,9 @@ import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -53,19 +55,27 @@ public class TestService {
         return TestDto.from(testRepository.save(test));
     }
 
+    private Map<String, Long> getDifficultyBreakdown(String testId, String competenceId) {
+        Map<String, Long> breakdown = new HashMap<>();
+        testQuestionRepository.countByDifficulty(testId, competenceId)
+                .forEach(r -> breakdown.put((String) r[0], (Long) r[1]));
+        return breakdown;
+    }
+
     @Transactional(readOnly = true)
     public PagedResponse<TestDto> findAll(Pageable pageable, boolean activeOnly) {
         Page<Test> page = activeOnly
                 ? testRepository.findAllActiveWithCompetence(pageable)
                 : testRepository.findAllWithCompetence(pageable);
-        return PagedResponse.from(page.map(TestDto::from));
+        return PagedResponse.from(page.map(t ->
+                TestDto.from(t, getDifficultyBreakdown(t.getTestId(), t.getCompetenceId()))));
     }
 
     @Transactional(readOnly = true)
     public TestDto findById(String testId, String competenceId) {
         Test test = testRepository.findById(new TestPK(testId, competenceId))
                 .orElseThrow(() -> new ResourceNotFoundException("Test", testId));
-        return TestDto.from(test);
+        return TestDto.from(test, getDifficultyBreakdown(testId, competenceId));
     }
 
     @Transactional(readOnly = true)

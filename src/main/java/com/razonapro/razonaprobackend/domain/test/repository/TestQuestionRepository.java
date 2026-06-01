@@ -13,4 +13,15 @@ public interface TestQuestionRepository extends JpaRepository<TestQuestion, Inte
     boolean existsByCompetenceIdAndTestIdAndQuestionId(String competenceId, String testId, String questionId);
     Optional<TestQuestion> findByCompetenceIdAndTestIdAndQuestionId(String competenceId, String testId, String questionId);
     long countByTestIdAndCompetenceId(String testId, String competenceId);
+
+    @org.springframework.data.jpa.repository.Query("""
+        SELECT tq.question.difficultyLevel, COUNT(tq)
+        FROM TestQuestion tq
+        WHERE tq.testId = :testId AND tq.competenceId = :competenceId AND tq.isActive = true
+        GROUP BY tq.question.difficultyLevel
+    """)
+    List<Object[]> countByDifficulty(
+        @org.springframework.data.repository.query.Param("testId")       String testId,
+        @org.springframework.data.repository.query.Param("competenceId") String competenceId
+    );
 }

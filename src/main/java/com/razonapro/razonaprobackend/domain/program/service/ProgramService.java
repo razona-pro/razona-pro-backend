@@ -56,6 +56,14 @@ public class ProgramService {
     }
 
     @Transactional
+    public ProgramDto activate(String id) {
+        Program p = programRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Programa", id));
+        p.setIsActive(true);
+        return ProgramDto.from(programRepository.save(p));
+    }
+
+    @Transactional
     public void deactivate(String id) {
         Program p = programRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Programa", id));

@@ -8,6 +8,8 @@ import com.razonapro.razonaprobackend.domain.doubt.dto.DoubtRequest;
 import com.razonapro.razonaprobackend.domain.doubt.model.QuestionDoubt;
 import com.razonapro.razonaprobackend.domain.doubt.repository.QuestionDoubtRepository;
 import com.razonapro.razonaprobackend.domain.notification.service.NotificationService;
+import com.razonapro.razonaprobackend.domain.question.dto.response.OptionDto;
+import com.razonapro.razonaprobackend.domain.question.repository.OptionRepository;
 import com.razonapro.razonaprobackend.domain.question.repository.QuestionRepository;
 import com.razonapro.razonaprobackend.infrastructure.security.UserPrincipal;
 import com.razonapro.razonaprobackend.infrastructure.util.IdGenerator;
@@ -21,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +31,7 @@ public class DoubtService {
 
     private final QuestionDoubtRepository repo;
     private final QuestionRepository      questionRepository;
+    private final OptionRepository        optionRepository;
     private final AiQuestionRepository    aiQuestionRepository;
     private final AdminRepository         adminRepository;
     private final NotificationService     notificationService;
@@ -44,7 +48,6 @@ public class DoubtService {
                 .statement(statement).message(req.getMessage())
                 .build());
 
-        // Notificar a todos los admins activos
         adminRepository.findAll().stream()
                 .filter(a -> Boolean.TRUE.equals(a.getIsActive()))
                 .forEach(a -> notificationService.notify(
@@ -52,14 +55,14 @@ public class DoubtService {
                         "Nueva duda reportada",
                         "El estudiante " + p.getId() + " reportó una duda (" + req.getSource() + ").",
                         "/admin/doubts"));
-        return DoubtDto.from(d);
+        return DoubtDto.from(d, resolveOptions(d));
     }
 
     public PagedResponse<DoubtDto> findAll(String status, Pageable pageable) {
         var page = (status == null || status.isBlank())
                 ? repo.findAllByOrderByCreatedAtDesc(pageable)
                 : repo.findByStatusOrderByCreatedAtDesc(status.toUpperCase(), pageable);
-        return PagedResponse.from(page.map(DoubtDto::from));
+        return PagedResponse.from(page.map(d -> DoubtDto.from(d, resolveOptions(d))));
     }
 
     @Transactional
@@ -68,7 +71,8 @@ public class DoubtService {
                 .orElseThrow(() -> new ApiException(ErrorCode.DOUBT_NOT_FOUND));
         d.setStatus(status.toUpperCase());
         if (!"OPEN".equalsIgnoreCase(status)) d.setReviewedAt(LocalDateTime.now());
-        return DoubtDto.from(repo.save(d));
+        QuestionDoubt saved = repo.save(d);
+        return DoubtDto.from(saved, resolveOptions(saved));
     }
 
     private String resolveStatement(DoubtRequest req) {
@@ -79,6 +83,14 @@ public class DoubtService {
         if ("AI".equals(req.getSource()) && req.getAiQuestionId() != null) {
             return aiQuestionRepository.findById(req.getAiQuestionId())
                     .map(q -> q.getStatement()).orElse(null);
+        }
+        return null;
+    }
+
+    private List<OptionDto> resolveOptions(QuestionDoubt d) {
+        if ("STATIC".equals(d.getSource()) && d.getCompetenceId() != null && d.getQuestionId() != null) {
+            return optionRepository.findByCompetenceIdAndQuestionId(d.getCompetenceId(), d.getQuestionId())
+                    .stream().map(OptionDto::from).toList();
         }
         return null;
     }

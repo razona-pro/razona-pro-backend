@@ -6,6 +6,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -31,4 +32,28 @@ public interface TriedRepository extends JpaRepository<Tried, TriedId> {
         FROM Tried t WHERE t.status = 'FINISHED'
     """)
     double satisfactionPercentage();
+
+    @Query("""
+        SELECT t.studentId,
+               COUNT(t) as totalTrieds,
+               COALESCE(AVG(t.score), 0) as avgScore,
+               COALESCE(SUM(t.correctAnswers), 0) as totalCorrect,
+               COALESCE(SUM(t.totalQuestions), 0) as totalQuestions
+        FROM Tried t
+        WHERE t.status = 'FINISHED'
+        GROUP BY t.studentId
+        ORDER BY avgScore DESC
+    """)
+    List<Object[]> findStudentPerformanceSummary();
+
+    @Query("""
+        SELECT t.studentId,
+               t.competenceId,
+               COUNT(t) as totalTrieds,
+               COALESCE(AVG(t.score), 0) as avgScore
+        FROM Tried t
+        WHERE t.status = 'FINISHED' AND t.studentId = :studentId
+        GROUP BY t.studentId, t.competenceId
+    """)
+    List<Object[]> findStudentPerformanceByCompetence(@Param("studentId") String studentId);
 }

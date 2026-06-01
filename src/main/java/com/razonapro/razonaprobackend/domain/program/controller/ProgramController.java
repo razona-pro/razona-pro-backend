@@ -34,7 +34,7 @@ public class ProgramController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','STUDENT')")
     public ResponseEntity<ApiResponse<ProgramDto>> findById(@PathVariable String id) {
         return ResponseEntity.ok(ApiResponse.ok(programService.findById(id)));
     }
@@ -50,6 +50,12 @@ public class ProgramController {
     public ResponseEntity<ApiResponse<ProgramDto>> update(
             @PathVariable String id, @Valid @RequestBody ProgramRequest req) {
         return ResponseEntity.ok(ApiResponse.ok(programService.update(id, req)));
+    }
+
+    @PutMapping("/{id}/activate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<ProgramDto>> activate(@PathVariable String id) {
+        return ResponseEntity.ok(ApiResponse.ok(programService.activate(id)));
     }
 
     @DeleteMapping("/{id}")
