@@ -195,26 +195,9 @@ public class TriedService {
                 .build();
         triedRepository.save(tried);
 
-        // Pre-crear StudentResponse con opción centinela OTN000
-        for (TestQuestion tq : selected) {
-            // QUITA: ensureUnansweredOption(...)
-
-            responseRepository.save(StudentResponse.builder()
-                    .studentResponseId(IdGenerator.studentResponseId())
-                    .competenceId(tried.getCompetenceId())
-                    .testId(tried.getTestId())
-                    .programId(tried.getProgramId())
-                    .studentId(tried.getStudentId())
-                    .triedId(tried.getTriedId())
-                    .questionId(tq.getQuestionId())
-                    .optionId(null)          // era: IdGenerator.UNANSWERED_OPTION_ID
-                    .isCorrect(false)
-                    .build());
-        }
-
+        // NO pre-crear StudentResponse — se crean al responder
         return TriedDto.fromWithQuestions(tried, selected);
     }
-
     /**
      * Garantiza que exista la opción centinela OTN000 para la pregunta.
      * Es la opción "Sin responder" — is_correct = false, nunca se muestra al estudiante.
@@ -247,28 +230,44 @@ public class TriedService {
                         new OptionId(tried.getCompetenceId(), req.getQuestionId(), req.getOptionId()))
                 .orElseThrow(() -> new ApiException(ErrorCode.INVALID_OPTION));
 
-        // No permitir seleccionar la opción centinela
         if (IdGenerator.UNANSWERED_OPTION_ID.equals(req.getOptionId()))
             throw new ApiException(ErrorCode.INVALID_OPTION);
 
-        StudentResponse sr = responseRepository
-                .findByTriedIdAndQuestionId(triedId, req.getQuestionId())
-                .orElseThrow(() -> new ApiException(ErrorCode.INVALID_INPUT,
-                        "Pregunta no pertenece a este intento"));
+        // Verificar que la pregunta pertenece al test
+        boolean questionBelongs = testQuestionRepository
+                .existsByCompetenceIdAndTestIdAndQuestionId(tried.getCompetenceId(), tried.getTestId(), req.getQuestionId());
+        if (!questionBelongs)
+            throw new ApiException(ErrorCode.INVALID_INPUT, "Pregunta no pertenece a este test");
 
-        sr.setOptionId(req.getOptionId());
-        sr.setIsCorrect(selectedOption.getIsCorrect());
-        sr.setAnsweredAt(LocalDateTime.now());
-        responseRepository.save(sr);
+        // Buscar respuesta existente o crear nueva
+        var existingOpt = responseRepository.findByTriedIdAndQuestionId(triedId, req.getQuestionId());
+        if (existingOpt.isPresent()) {
+            StudentResponse sr = existingOpt.get();
+            sr.setOptionId(req.getOptionId());
+            sr.setIsCorrect(selectedOption.getIsCorrect());
+            sr.setAnsweredAt(LocalDateTime.now());
+            responseRepository.save(sr);
+        } else {
+            responseRepository.save(StudentResponse.builder()
+                    .studentResponseId(IdGenerator.studentResponseId())
+                    .competenceId(tried.getCompetenceId())
+                    .testId(tried.getTestId())
+                    .programId(tried.getProgramId())
+                    .studentId(tried.getStudentId())
+                    .triedId(tried.getTriedId())
+                    .questionId(req.getQuestionId())
+                    .optionId(req.getOptionId())
+                    .isCorrect(selectedOption.getIsCorrect())
+                    .answeredAt(LocalDateTime.now())
+                    .build());
+        }
 
-        // Contar correctas excluyendo la centinela
         long correct = responseRepository.countByTriedIdAndIsCorrectTrueAndOptionIdIsNotNull(triedId);
         tried.setCorrectAnswers((int) correct);
         triedRepository.save(tried);
 
         return TriedDto.from(tried);
     }
-
     // ── Finalizar manualmente ────────────────────────────────────────────
 
     @Transactional
@@ -291,7 +290,6 @@ public class TriedService {
         tried.setStatus("FINISHED");
         tried.setFinishedAt(LocalDateTime.now());
 
-        // Solo respuestas reales (no la centinela OTN000)
         List<StudentResponse> responses = responseRepository
                 .findByTriedIdAndOptionIdIsNotNull(tried.getTriedId());
 
@@ -305,6 +303,7 @@ public class TriedService {
             if (Boolean.TRUE.equals(sr.getIsCorrect())) earnedPoints += pts;
         }
 
+        // Si no respondió ninguna, score = 0
         if (totalPoints > 0) {
             BigDecimal score = BigDecimal.valueOf(earnedPoints)
                     .divide(BigDecimal.valueOf(totalPoints), 4, RoundingMode.HALF_UP)
@@ -318,7 +317,6 @@ public class TriedService {
         long correct = responses.stream().filter(r -> Boolean.TRUE.equals(r.getIsCorrect())).count();
         tried.setCorrectAnswers((int) correct);
     }
-
     private int difficultyPoints(String level) {
         return switch (level == null ? "M" : level) {
             case "B" -> 1;

@@ -25,6 +25,12 @@ public class StudentController {
 
     private final StudentService studentService;
 
+    @PutMapping("/{studentId}/activate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<StudentDto>> activate(@PathVariable String studentId) {
+        return ResponseEntity.ok(ApiResponse.ok(studentService.activate(studentId)));
+    }
+
     @GetMapping("/me")
     @PreAuthorize("hasRole('STUDENT')")
     @Operation(summary = "Perfil del estudiante autenticado")

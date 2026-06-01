@@ -43,6 +43,14 @@ public class TestService {
     private final AdminRepository        adminRepository;
     private final NotificationService notificationService;
 
+    @Transactional
+    public TestDto activate(String testId, String competenceId) {
+        Test test = testRepository.findById(new TestPK(testId, competenceId))
+                .orElseThrow(() -> new ResourceNotFoundException("Test", testId));
+        test.setIsActive(true);
+        return TestDto.from(testRepository.save(test));
+    }
+
     @Transactional(readOnly = true)
     public PagedResponse<TestDto> findAll(Pageable pageable, boolean activeOnly) {
         Page<Test> page = activeOnly

@@ -22,6 +22,14 @@ public class StudentService {
         return PagedResponse.from(studentRepository.findAll(pageable).map(StudentDto::from));
     }
 
+    @Transactional
+    public StudentDto activate(String studentId) {
+        Student s = studentRepository.findByStudentId(studentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Estudiante", studentId));
+        s.setIsActive(true);
+        return StudentDto.from(studentRepository.save(s));
+    }
+
     public StudentDto findById(String studentId) {
         return StudentDto.from(studentRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Estudiante", studentId)));

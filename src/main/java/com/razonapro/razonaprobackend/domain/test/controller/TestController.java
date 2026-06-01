@@ -28,6 +28,13 @@ public class TestController {
 
     private final TestService testService;
 
+    @PutMapping("/{testId}/{competenceId}/activate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<TestDto>> activate(
+            @PathVariable String testId, @PathVariable String competenceId) {
+        return ResponseEntity.ok(ApiResponse.ok(testService.activate(testId, competenceId)));
+    }
+
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','STUDENT')")
     public ResponseEntity<ApiResponse<PagedResponse<TestDto>>> findAll(
