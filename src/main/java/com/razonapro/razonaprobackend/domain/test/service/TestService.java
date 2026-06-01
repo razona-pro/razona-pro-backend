@@ -8,6 +8,7 @@ import com.razonapro.razonaprobackend.domain.question.dto.response.QuestionDto;
 import com.razonapro.razonaprobackend.domain.question.repository.OptionRepository;
 import com.razonapro.razonaprobackend.domain.question.repository.QuestionRepository;
 import com.razonapro.razonaprobackend.domain.test.dto.request.TestRequest;
+import com.razonapro.razonaprobackend.domain.test.dto.request.TestUpdateRequest;
 import com.razonapro.razonaprobackend.domain.test.dto.response.TestDto;
 import com.razonapro.razonaprobackend.domain.test.model.Test;
 import com.razonapro.razonaprobackend.domain.test.model.TestQuestion;
@@ -26,6 +27,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -41,7 +43,7 @@ public class TestService {
     private final OptionRepository       optionRepository;
     private final CompetenceRepository   competenceRepository;
     private final AdminRepository        adminRepository;
-    private final NotificationService notificationService;
+    private final NotificationService    notificationService;
 
     @Transactional
     public TestDto activate(String testId, String competenceId) {
@@ -70,7 +72,6 @@ public class TestService {
     public List<QuestionDto> getTestQuestions(String testId, String competenceId, boolean showCorrect) {
         List<TestQuestion> tqs = testQuestionRepository
                 .findByTestIdAndCompetenceIdAndIsActiveTrue(testId, competenceId);
-
         Test test = testRepository.findById(new TestPK(testId, competenceId))
                 .orElseThrow(() -> new ResourceNotFoundException("Test", testId));
 
@@ -82,9 +83,9 @@ public class TestService {
         }
 
         return selected.stream().map(tq -> {
-            var q = questionRepository.findById(new QuestionId(tq.getCompetenceId(), tq.getQuestionId()))
-                    .orElseThrow();
+            var q = questionRepository.findById(new QuestionId(tq.getCompetenceId(), tq.getQuestionId())).orElseThrow();
             var opts = optionRepository.findByCompetenceIdAndQuestionId(tq.getCompetenceId(), tq.getQuestionId());
+            Collections.shuffle(opts);
             if (showCorrect) return QuestionDto.from(q, opts);
             return QuestionDto.builder()
                     .competenceId(q.getCompetenceId())
@@ -101,6 +102,12 @@ public class TestService {
         competenceRepository.findById(req.getCompetenceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Competencia", req.getCompetenceId()));
 
+        String normalizedName = req.getTestName().trim().toUpperCase();
+        if (testRepository.existsByTestNameIgnoreCaseAndCompetenceId(normalizedName, req.getCompetenceId())) {
+            throw new ApiException(ErrorCode.DUPLICATE_RESOURCE,
+                    "Ya existe un test con el nombre \"" + req.getTestName() + "\" en esta competencia.");
+        }
+
         Test test = Test.builder()
                 .testId(IdGenerator.testId(testRepository.count()))
                 .competenceId(req.getCompetenceId())
@@ -112,9 +119,36 @@ public class TestService {
                 .questionsToPresent(req.getQuestionsToPresent())
                 .testMode(req.getTestMode())
                 .build();
-        notificationService.broadcastNewTest(test.getTestName(),
+
+        Test saved = testRepository.save(test);
+
+        notificationService.broadcastNewTest(saved.getTestName(),
                 competenceRepository.findById(req.getCompetenceId())
                         .map(c -> c.getCompetenceName()).orElse(req.getCompetenceId()));
+
+        return TestDto.from(saved);
+    }
+
+    @Transactional
+    public TestDto update(String testId, String competenceId, TestUpdateRequest req, UserPrincipal principal) {
+        Test test = testRepository.findById(new TestPK(testId, competenceId))
+                .orElseThrow(() -> new ResourceNotFoundException("Test", testId));
+
+        if (StringUtils.hasText(req.getTestName())) {
+            String normalizedName = req.getTestName().trim().toUpperCase();
+            if (testRepository.existsByTestNameIgnoreCaseAndCompetenceIdAndTestIdNot(
+                    normalizedName, competenceId, testId)) {
+                throw new ApiException(ErrorCode.DUPLICATE_RESOURCE,
+                        "Ya existe un test con ese nombre en esta competencia.");
+            }
+            test.setTestName(req.getTestName());
+        }
+        if (StringUtils.hasText(req.getDescription()))  test.setDescription(req.getDescription());
+        if (req.getDurationSeconds()    != null)       test.setDurationSeconds(req.getDurationSeconds());
+        if (req.getQuestionsToPresent() != null)       test.setQuestionsToPresent(req.getQuestionsToPresent());
+        if (StringUtils.hasText(req.getTestMode()))    test.setTestMode(req.getTestMode());
+        if (req.getIsActive()           != null)       test.setIsActive(req.getIsActive());
+
         return TestDto.from(testRepository.save(test));
     }
 
@@ -131,11 +165,8 @@ public class TestService {
         long order = testQuestionRepository.countByTestIdAndCompetenceId(testId, competenceId) + 1;
         testQuestionRepository.save(TestQuestion.builder()
                 .admin(adminRepository.findById(principal.getId()).orElseThrow())
-                .competenceId(competenceId)
-                .testId(testId)
-                .questionId(questionId)
-                .questionOrder((int) order)
-                .build());
+                .competenceId(competenceId).testId(testId).questionId(questionId)
+                .questionOrder((int) order).build());
     }
 
     @Transactional

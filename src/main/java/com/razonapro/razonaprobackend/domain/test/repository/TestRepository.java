@@ -18,4 +18,11 @@ public interface TestRepository extends JpaRepository<Test, TestPK> {
     @Query(value = "SELECT t FROM Test t JOIN FETCH t.competence",
             countQuery = "SELECT COUNT(t) FROM Test t")
     Page<Test> findAllWithCompetence(Pageable pageable);
+
+    /** Verificar nombre único por competencia (para crear) */
+    boolean existsByTestNameIgnoreCaseAndCompetenceId(String testName, String competenceId);
+
+    /** Verificar nombre único por competencia excluyendo el propio (para editar) */
+    boolean existsByTestNameIgnoreCaseAndCompetenceIdAndTestIdNot(
+            String testName, String competenceId, String testId);
 }
