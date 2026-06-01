@@ -1,4 +1,3 @@
-// domain/aitried/service/AiTriedService.java
 package com.razonapro.razonaprobackend.domain.aitried.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -54,7 +53,8 @@ public class AiTriedService {
     private final AiModelProperties         aiProps;
     private final ObjectMapper              mapper;
 
-    // ── Consultas ──
+    // ── Consultas ──────────────────────────────────────────────────────
+
     public PagedResponse<AiTriedDto> findMy(UserPrincipal p, Pageable pageable) {
         return PagedResponse.from(aiTriedRepository
                 .findByStudentIdAndProgramId(p.getId(), p.getProgramId(), pageable)
@@ -67,36 +67,41 @@ public class AiTriedService {
         return AiTriedDto.from(at);
     }
 
-    /** Historial detallado: cada pregunta con su resultado. */
+    public List<AiQuestionDto> listQuestions(String aiTriedId, UserPrincipal p) {
+        AiTried at = getOrThrow(aiTriedId);
+        assertOwnership(at, p);
+        return aiQuestionRepository.findByAiTriedIdOrderByQuestionOrderAsc(aiTriedId)
+                .stream().map(q -> toDto(q, at.getTotalQuestions(), false)).toList();
+    }
+
     public List<AiQuestionDto> getReview(String aiTriedId, UserPrincipal p) {
         AiTried at = getOrThrow(aiTriedId);
         assertOwnership(at, p);
-        List<AiQuestion> qs = aiQuestionRepository.findByAiTriedIdOrderByQuestionOrderAsc(aiTriedId);
-        List<AiQuestionDto> out = new ArrayList<>();
-        for (AiQuestion q : qs) out.add(toDto(q, at.getTotalQuestions(), true));
-        return out;
+        return aiQuestionRepository.findByAiTriedIdOrderByQuestionOrderAsc(aiTriedId)
+                .stream().map(q -> toDto(q, at.getTotalQuestions(), true)).toList();
     }
 
-    // ── Estado ──
+    // ── Estado ──────────────────────────────────────────────────────────
+
     public AiStatusDto getStatus() {
-        boolean enabled = aiProps.isEnabled();
-        String provider = aiProps.getProvider().name();
-        String model    = aiProps.getCloudModel();
+        boolean enabled  = aiProps.isEnabled();
+        String provider  = aiProps.getProvider().name();
+        String model     = aiProps.getCloudModel();
         boolean reachable = false;
         String message;
         if (!enabled || aiProps.getProvider() == AiModelProperties.Provider.NONE) {
-            message = "Módulo IA deshabilitado.";
+            message = "Módulo IA no habilitado.";
         } else {
             try {
                 reachable = questionGenerator.isAvailable();
-                message = reachable ? "Proveedor IA disponible: " + model
-                        : "Proveedor IA configurado pero no alcanzable.";
+                message   = reachable ? "Servicio de preguntas activo" : "Proveedor configurado pero no alcanzable.";
             } catch (Exception e) { message = "Error verificando IA: " + e.getMessage(); }
         }
         return new AiStatusDto(enabled, provider, model, reachable, message);
     }
 
-    // ── Iniciar: genera TODO el batch ──
+    // ── Iniciar — genera SÓLO la primera pregunta (adaptativo) ──────────
+
     @Transactional
     public AiStartResponseDto start(StartAiTriedRequest req, UserPrincipal p) {
         if (!questionGenerator.isAvailable())
@@ -105,65 +110,54 @@ public class AiTriedService {
         Competence comp = competenceRepository.findById(req.getCompetenceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Competencia", req.getCompetenceId()));
 
-        // 1. Generar batch (fuera de cualquier lock largo: una sola llamada IA)
-        List<AiGeneratedQuestion> batch;
-        try {
-            batch = questionGenerator.generateBatch(
-                    comp.getCompetenceName(),
-                    comp.getDescription() != null ? comp.getDescription() : "",
-                    req.getTotalQuestions(), 5);
-        } catch (AiUnavailableException e) {
-            throw new ApiException(ErrorCode.AI_GENERATION_FAILED, e.getMessage());
-        }
-        if (batch.isEmpty()) throw new ApiException(ErrorCode.AI_BATCH_EMPTY);
-
-        int total = Math.min(batch.size(), req.getTotalQuestions());
-
-        // 2. Crear AiTried
         AiTried at = AiTried.builder()
                 .programId(p.getProgramId())
                 .studentId(p.getId())
                 .aiTriedId(IdGenerator.aiTriedId())
                 .competenceId(comp.getCompetenceId())
-                .totalQuestions(total)
+                .totalQuestions(req.getTotalQuestions())
                 .description(req.getDescription())
+                .theta(BigDecimal.ZERO)
                 .build();
         aiTriedRepository.save(at);
 
-        // 3. Persistir todas las preguntas
-        for (int i = 0; i < total; i++) {
-            AiGeneratedQuestion g = batch.get(i);
-            aiQuestionRepository.save(AiQuestion.builder()
-                    .aiQuestionId(IdGenerator.aiQuestionId())
-                    .programId(at.getProgramId())
-                    .studentId(at.getStudentId())
-                    .aiTriedId(at.getAiTriedId())
-                    .competenceId(comp.getCompetenceId())
-                    .questionOrder(i + 1)
-                    .statement(g.statement())
-                    .optionsJson(writeOptions(g.options()))
-                    .correctIndex(g.correctIndex())
-                    .explanation(g.explanation())
-                    .difficultyLevel(g.difficultyLevel())
-                    .build());
-        }
-
-        AiQuestion first = aiQuestionRepository
-                .findByAiTriedIdOrderByQuestionOrderAsc(at.getAiTriedId()).get(0);
-        return new AiStartResponseDto(AiTriedDto.from(at), toDto(first, total, false), total);
+        // Primera pregunta en dificultad 5 (media)
+        AiQuestion first = generateAndSave(at, comp, 1, 5);
+        return new AiStartResponseDto(AiTriedDto.from(at), toDto(first, req.getTotalQuestions(), false), 1);
     }
 
-    // ── Obtener pregunta por número (navegación) ──
-    public List<AiQuestionDto> listQuestions(String aiTriedId, UserPrincipal p) {
+    // ── Generar siguiente pregunta adaptativa ────────────────────────────
+
+    @Transactional
+    public AiQuestionDto generateNextQuestion(String aiTriedId, UserPrincipal p) {
         AiTried at = getOrThrow(aiTriedId);
         assertOwnership(at, p);
-        List<AiQuestion> qs = aiQuestionRepository.findByAiTriedIdOrderByQuestionOrderAsc(aiTriedId);
-        List<AiQuestionDto> out = new ArrayList<>();
-        for (AiQuestion q : qs) out.add(toDto(q, at.getTotalQuestions(), false));
-        return out;
+        assertInProgress(at);
+
+        List<AiQuestion> existing = aiQuestionRepository.findByAiTriedIdOrderByQuestionOrderAsc(aiTriedId);
+        int nextOrder = existing.size() + 1;
+
+        if (nextOrder > at.getTotalQuestions())
+            throw new ApiException(ErrorCode.TRIED_ALREADY_FINISHED, "Ya se generaron todas las preguntas.");
+
+        // Calcular theta actualizado y determinar dificultad objetivo
+        double theta    = computeTheta(existing);
+        int    target   = thetaToDifficulty(theta);
+
+        Competence comp = competenceRepository.findById(at.getCompetenceId())
+                .orElseThrow(() -> new ResourceNotFoundException("Competencia", at.getCompetenceId()));
+
+        AiQuestion q = generateAndSave(at, comp, nextOrder, target);
+
+        // Persistir theta actualizado
+        at.setTheta(BigDecimal.valueOf(theta).setScale(3, RoundingMode.HALF_UP));
+        aiTriedRepository.save(at);
+
+        return toDto(q, at.getTotalQuestions(), false);
     }
 
-    // ── Responder ──
+    // ── Responder ────────────────────────────────────────────────────────
+
     @Transactional
     public AiAnswerResultDto submitAnswer(String aiTriedId, SubmitAiAnswerRequest req, UserPrincipal p) {
         AiTried at = getOrThrow(aiTriedId);
@@ -184,13 +178,12 @@ public class AiTriedService {
 
         boolean isCorrect = (sel == q.getCorrectIndex());
 
-        // Persistir en ai_questions
         q.setSelectedIndex(sel);
         q.setIsCorrect(isCorrect);
         q.setAnsweredAt(LocalDateTime.now());
         aiQuestionRepository.save(q);
 
-        // Persistir en ai_tried_responses (dispara triggers de correct_answers)
+        // Persistir en ai_tried_responses
         Competence comp = competenceRepository.findById(q.getCompetenceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Competencia", q.getCompetenceId()));
         aiTriedResponseRepository.save(AiTriedResponse.builder()
@@ -206,25 +199,39 @@ public class AiTriedService {
                 .competence(comp)
                 .build());
 
-        // Recontar respondidas y correctas
-        long answered = aiQuestionRepository.countByAiTriedIdAndSelectedIndexIsNotNull(aiTriedId);
-        long correct  = aiTriedResponseRepository.findByAiTriedId(aiTriedId).stream()
-                .filter(r -> Boolean.TRUE.equals(r.getIsCorrect())).count();
-        at.setCorrectAnswers((int) correct);
+        // Recalcular stats con scoring por dificultad
+        List<AiQuestion> all = aiQuestionRepository.findByAiTriedIdOrderByQuestionOrderAsc(aiTriedId);
+        long answered   = all.stream().filter(x -> x.getSelectedIndex() != null).count();
+        int[] pts       = computePoints(all);
+        int earnedPts   = pts[0], maxPts = pts[1];
+        int correctCount= (int) all.stream().filter(x -> Boolean.TRUE.equals(x.getIsCorrect())).count();
+
+        at.setCorrectAnswers(correctCount);
 
         boolean finished = answered >= at.getTotalQuestions();
+        boolean hasNext  = !finished;
         Double finalScore = null;
+        int nextDiff = 0;
+
         if (finished) {
-            finishAiTried(at);
+            finishAiTried(at, all);
             finalScore = at.getScore() != null ? at.getScore().doubleValue() : 0.0;
+        } else {
+            double theta = computeTheta(all);
+            nextDiff = thetaToDifficulty(theta);
+            at.setTheta(BigDecimal.valueOf(theta).setScale(3, RoundingMode.HALF_UP));
         }
         aiTriedRepository.save(at);
 
-        return new AiAnswerResultDto(isCorrect, sel, q.getCorrectIndex(), q.getExplanation(),
-                (int) correct, (int) answered, at.getTotalQuestions(), finished, finalScore);
+        return new AiAnswerResultDto(
+                isCorrect, sel, q.getCorrectIndex(), q.getExplanation(),
+                correctCount, (int) answered, at.getTotalQuestions(),
+                finished, hasNext, finalScore,
+                earnedPts, maxPts, nextDiff);
     }
 
-    // ── Pista ──
+    // ── Pista ────────────────────────────────────────────────────────────
+
     @Transactional
     public AiHintDto getHint(String aiTriedId, AiHintRequest req, UserPrincipal p) {
         if (!aiTutor.isAvailable())
@@ -238,23 +245,19 @@ public class AiTriedService {
                 .findByAiQuestionIdAndAiTriedId(req.getAiQuestionId(), aiTriedId)
                 .orElseThrow(() -> new ApiException(ErrorCode.AI_QUESTION_NOT_FOUND));
 
-        // El front bloquea botones inferiores; backend valida progresión y tope
         if (req.getHintLevel() > q.getHintsUsed() + 1)
-            throw new ApiException(ErrorCode.AI_INVALID_OPTION, "Debes pedir las pistas en orden.");
+            throw new ApiException(ErrorCode.AI_INVALID_OPTION, "Solicita las pistas en orden.");
         if (q.getHintsUsed() >= 3)
             throw new ApiException(ErrorCode.HINT_LIMIT_REACHED);
 
         List<AiOption> options = readOptions(q.getOptionsJson());
-        List<String> texts = new ArrayList<>();
-        for (AiOption o : options) texts.add(o.text());
-
-        AiHintContext ctx = new AiHintContext(
-                q.getCompetenceId(), q.getStatement(), texts,
-                options.get(q.getCorrectIndex()).text(), req.getHintLevel());
+        List<String>   texts   = options.stream().map(AiOption::text).toList();
 
         String hint;
         try {
-            hint = aiTutor.generateHint(ctx);
+            hint = aiTutor.generateHint(new AiHintContext(
+                    q.getCompetenceId(), q.getStatement(), texts,
+                    options.get(q.getCorrectIndex()).text(), req.getHintLevel()));
         } catch (AiUnavailableException e) {
             throw new ApiException(ErrorCode.AI_GENERATION_FAILED, e.getMessage());
         }
@@ -264,7 +267,8 @@ public class AiTriedService {
         return new AiHintDto(hint, req.getHintLevel());
     }
 
-    // ── Finalizar manual ──
+    // ── Finalizar manual ─────────────────────────────────────────────────
+
     @Transactional
     public AiTriedDto finish(String aiTriedId, Integer timeSpentSeconds, UserPrincipal p) {
         AiTried at = getOrThrow(aiTriedId);
@@ -272,28 +276,101 @@ public class AiTriedService {
         if (!"IN_PROGRESS".equals(at.getStatus()))
             throw new ApiException(ErrorCode.TRIED_ALREADY_FINISHED);
         if (timeSpentSeconds != null) at.setTimeSpentSeconds(timeSpentSeconds);
-        finishAiTried(at);
+        List<AiQuestion> all = aiQuestionRepository.findByAiTriedIdOrderByQuestionOrderAsc(aiTriedId);
+        finishAiTried(at, all);
         return AiTriedDto.from(aiTriedRepository.save(at));
     }
 
-    // ── Helpers ──
-    private void finishAiTried(AiTried at) {
+    // ── Helpers privados ─────────────────────────────────────────────────
+
+    /** Genera UNA pregunta, la persiste y la retorna. */
+    private AiQuestion generateAndSave(AiTried at, Competence comp, int order, int targetDiff) {
+        List<AiGeneratedQuestion> batch;
+        try {
+            batch = questionGenerator.generateBatch(
+                    comp.getCompetenceName(),
+                    comp.getDescription() != null ? comp.getDescription() : "",
+                    1, targetDiff);
+        } catch (AiUnavailableException e) {
+            throw new ApiException(ErrorCode.AI_GENERATION_FAILED, e.getMessage());
+        }
+        if (batch.isEmpty()) throw new ApiException(ErrorCode.AI_BATCH_EMPTY);
+
+        AiGeneratedQuestion g = batch.get(0);
+        AiQuestion q = AiQuestion.builder()
+                .aiQuestionId(IdGenerator.aiQuestionId())
+                .programId(at.getProgramId())
+                .studentId(at.getStudentId())
+                .aiTriedId(at.getAiTriedId())
+                .competenceId(at.getCompetenceId())
+                .questionOrder(order)
+                .statement(g.statement())
+                .optionsJson(writeOptions(g.options()))
+                .correctIndex(g.correctIndex())
+                .explanation(g.explanation())
+                .difficultyLevel(Math.max(1, Math.min(10, g.difficultyLevel())))
+                .build();
+        return aiQuestionRepository.save(q);
+    }
+
+    /** Score basado en suma de dificultades (ponderado). */
+    private void finishAiTried(AiTried at, List<AiQuestion> questions) {
         at.setStatus("FINISHED");
         at.setFinishedAt(LocalDateTime.now());
-        if (at.getTotalQuestions() > 0 && at.getCorrectAnswers() != null) {
-            at.setScore(BigDecimal.valueOf(at.getCorrectAnswers())
-                    .divide(BigDecimal.valueOf(at.getTotalQuestions()), 4, RoundingMode.HALF_UP)
-                    .multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.HALF_UP));
+
+        int earned = 0, max = 0, correct = 0;
+        for (AiQuestion q : questions) {
+            int pts = q.getDifficultyLevel() != null ? q.getDifficultyLevel() : 5;
+            max += pts;
+            if (Boolean.TRUE.equals(q.getIsCorrect())) { earned += pts; correct++; }
         }
+        at.setCorrectAnswers(correct);
+        at.setScore(max > 0
+                ? BigDecimal.valueOf(earned)
+                .divide(BigDecimal.valueOf(max), 4, RoundingMode.HALF_UP)
+                .multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO);
+    }
+
+    /** Retorna [earnedPoints, maxPoints] para el set actual de preguntas. */
+    private int[] computePoints(List<AiQuestion> questions) {
+        int earned = 0, max = 0;
+        for (AiQuestion q : questions) {
+            int pts = q.getDifficultyLevel() != null ? q.getDifficultyLevel() : 5;
+            max += pts;
+            if (Boolean.TRUE.equals(q.getIsCorrect())) earned += pts;
+        }
+        return new int[]{earned, max};
+    }
+
+    /** Estimación theta con IRT 1PL simplificado. */
+    private double computeTheta(List<AiQuestion> questions) {
+        double theta = 0.0;
+        for (AiQuestion q : questions) {
+            if (q.getSelectedIndex() == null) continue;
+            double b = (q.getDifficultyLevel() - 5.5) * (6.0 / 9.0);
+            double p = 1.0 / (1.0 + Math.exp(b - theta));
+            theta += Boolean.TRUE.equals(q.getIsCorrect())
+                    ? 0.35 * (1.0 - p)
+                    : -0.35 * p;
+            theta = Math.max(-3.0, Math.min(3.0, theta));
+        }
+        return theta;
+    }
+
+    /** Convierte theta (-3..+3) a nivel de dificultad (1..10). */
+    private int thetaToDifficulty(double theta) {
+        int level = (int) Math.round(5.5 + theta * (9.0 / 6.0));
+        return Math.max(1, Math.min(10, level));
     }
 
     private AiQuestionDto toDto(AiQuestion q, int total, boolean reveal) {
-        List<AiOption> options = readOptions(q.getOptionsJson());
-        List<AiQuestionDto.OptionDto> opts = new ArrayList<>();
-        for (int i = 0; i < options.size(); i++)
-            opts.add(new AiQuestionDto.OptionDto("OPT" + i, options.get(i).text()));
+        List<AiOption> opts = readOptions(q.getOptionsJson());
+        List<AiQuestionDto.OptionDto> dtoOpts = new ArrayList<>();
+        for (int i = 0; i < opts.size(); i++)
+            dtoOpts.add(new AiQuestionDto.OptionDto("OPT" + i, opts.get(i).text()));
         return new AiQuestionDto(
-                q.getAiQuestionId(), q.getStatement(), opts, q.getDifficultyLevel(),
+                q.getAiQuestionId(), q.getStatement(), dtoOpts, q.getDifficultyLevel(),
                 q.getQuestionOrder(), total, q.getHintsUsed(),
                 q.getSelectedIndex(),
                 reveal ? q.getIsCorrect() : (q.getSelectedIndex() != null ? q.getIsCorrect() : null));
@@ -311,7 +388,7 @@ public class AiTriedService {
 
     private AiTried getOrThrow(String id) {
         return aiTriedRepository.findByAiTriedId(id)
-                .orElseThrow(() -> new ResourceNotFoundException("AI Intento", id));
+                .orElseThrow(() -> new ResourceNotFoundException("Sesión IA", id));
     }
 
     private void assertOwnership(AiTried at, UserPrincipal p) {

@@ -1,4 +1,3 @@
-// domain/aitried/controller/AiTriedController.java
 package com.razonapro.razonaprobackend.domain.aitried.controller;
 
 import com.razonapro.razonaprobackend.domain.aitried.dto.request.AiHintRequest;
@@ -27,7 +26,7 @@ import java.util.List;
 @RequestMapping("/api/ai-trieds")
 @RequiredArgsConstructor
 @PreAuthorize("hasAnyRole('STUDENT','ADMIN')")
-@Tag(name = "AI Trieds", description = "Práctica IA en tanda")
+@Tag(name = "AI Trieds", description = "Práctica IA adaptativa")
 public class AiTriedController {
 
     private final AiTriedService service;
@@ -54,7 +53,7 @@ public class AiTriedController {
     }
 
     @GetMapping("/{aiTriedId}/questions")
-    @Operation(summary = "Lista todas las preguntas del intento (sin revelar correcta si no respondida)")
+    @Operation(summary = "Lista preguntas generadas hasta ahora (sin revelar correcta si no respondida)")
     public ResponseEntity<ApiResponse<List<AiQuestionDto>>> listQuestions(
             @PathVariable String aiTriedId, @AuthenticationPrincipal UserPrincipal p) {
         return ResponseEntity.ok(ApiResponse.ok(service.listQuestions(aiTriedId, p)));
@@ -69,11 +68,19 @@ public class AiTriedController {
 
     @PostMapping("/start")
     @PreAuthorize("hasRole('STUDENT')")
-    @Operation(summary = "Inicia práctica: genera TODAS las preguntas y devuelve la primera")
+    @Operation(summary = "Inicia sesión adaptativa — genera SÓLO la primera pregunta")
     public ResponseEntity<ApiResponse<AiStartResponseDto>> start(
             @Valid @RequestBody StartAiTriedRequest req, @AuthenticationPrincipal UserPrincipal p) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.ok("Práctica IA iniciada", service.start(req, p)));
+                .body(ApiResponse.ok("Sesión IA iniciada", service.start(req, p)));
+    }
+
+    @PostMapping("/{aiTriedId}/next-question")
+    @PreAuthorize("hasRole('STUDENT')")
+    @Operation(summary = "Genera la siguiente pregunta adaptativa según el rendimiento actual")
+    public ResponseEntity<ApiResponse<AiQuestionDto>> nextQuestion(
+            @PathVariable String aiTriedId, @AuthenticationPrincipal UserPrincipal p) {
+        return ResponseEntity.ok(ApiResponse.ok(service.generateNextQuestion(aiTriedId, p)));
     }
 
     @PostMapping("/{aiTriedId}/answer")
@@ -98,7 +105,7 @@ public class AiTriedController {
             @PathVariable String aiTriedId,
             @RequestParam(required = false) Integer timeSpentSeconds,
             @AuthenticationPrincipal UserPrincipal p) {
-        return ResponseEntity.ok(ApiResponse.ok("Práctica finalizada",
+        return ResponseEntity.ok(ApiResponse.ok("Sesión finalizada",
                 service.finish(aiTriedId, timeSpentSeconds, p)));
     }
 }

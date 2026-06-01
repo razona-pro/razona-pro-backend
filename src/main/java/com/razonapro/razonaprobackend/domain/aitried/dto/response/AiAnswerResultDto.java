@@ -1,4 +1,3 @@
-// domain/aitried/dto/response/AiAnswerResultDto.java
 package com.razonapro.razonaprobackend.domain.aitried.dto.response;
 
 public record AiAnswerResultDto(
@@ -10,5 +9,9 @@ public record AiAnswerResultDto(
         int     totalAnswered,
         int     totalQuestions,
         boolean finished,
-        Double  finalScore
+        boolean hasNextQuestion,
+        Double  finalScore,
+        Integer earnedPoints,
+        Integer maxPoints,
+        Integer nextDifficulty
 ) {}
