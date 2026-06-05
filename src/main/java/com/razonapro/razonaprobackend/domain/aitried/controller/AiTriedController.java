@@ -52,6 +52,24 @@ public class AiTriedController {
         return ResponseEntity.ok(ApiResponse.ok(service.findById(aiTriedId, p)));
     }
 
+    @GetMapping("/student/{programId}/{studentId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Admin: intentos IA de un estudiante")
+    public ResponseEntity<ApiResponse<PagedResponse<AiTriedDto>>> findByStudent(
+            @PathVariable String programId, @PathVariable String studentId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(ApiResponse.ok(service.findByStudent(programId, studentId,
+                PageRequest.of(page, size, Sort.by("attemptTimestamp").descending()))));
+    }
+
+    @GetMapping("/{aiTriedId}/admin-questions")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Admin: preguntas que la IA generó en un intento (correcta revelada)")
+    public ResponseEntity<ApiResponse<List<AiQuestionDto>>> adminQuestions(@PathVariable String aiTriedId) {
+        return ResponseEntity.ok(ApiResponse.ok(service.questionsForAdmin(aiTriedId)));
+    }
+
     @GetMapping("/{aiTriedId}/questions")
     @Operation(summary = "Lista preguntas generadas hasta ahora (sin revelar correcta si no respondida)")
     public ResponseEntity<ApiResponse<List<AiQuestionDto>>> listQuestions(

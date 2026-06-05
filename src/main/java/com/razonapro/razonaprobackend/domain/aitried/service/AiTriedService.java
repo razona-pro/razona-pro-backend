@@ -9,6 +9,7 @@ import com.razonapro.razonaprobackend.domain.aitried.dto.response.*;
 import com.razonapro.razonaprobackend.domain.aitried.model.AiQuestion;
 import com.razonapro.razonaprobackend.domain.aitried.model.AiTried;
 import com.razonapro.razonaprobackend.domain.aitried.model.AiTriedResponse;
+import com.razonapro.razonaprobackend.domain.aitried.model.AiUserCompetence;
 import com.razonapro.razonaprobackend.domain.aitried.port.AiQuestionGenerator;
 import com.razonapro.razonaprobackend.domain.aitried.port.AiTutor;
 import com.razonapro.razonaprobackend.domain.aitried.port.dto.AiGeneratedQuestion;
@@ -17,6 +18,7 @@ import com.razonapro.razonaprobackend.domain.aitried.port.dto.AiOption;
 import com.razonapro.razonaprobackend.domain.aitried.repository.AiQuestionRepository;
 import com.razonapro.razonaprobackend.domain.aitried.repository.AiTriedRepository;
 import com.razonapro.razonaprobackend.domain.aitried.repository.AiTriedResponseRepository;
+import com.razonapro.razonaprobackend.domain.aitried.repository.AiUserCompetenceRepository;
 import com.razonapro.razonaprobackend.domain.competence.model.Competence;
 import com.razonapro.razonaprobackend.domain.competence.repository.CompetenceRepository;
 import com.razonapro.razonaprobackend.infrastructure.ai.AiUnavailableException;
@@ -27,6 +29,7 @@ import com.razonapro.razonaprobackend.shared.dto.PagedResponse;
 import com.razonapro.razonaprobackend.shared.exception.ApiException;
 import com.razonapro.razonaprobackend.shared.exception.ErrorCode;
 import com.razonapro.razonaprobackend.shared.exception.ResourceNotFoundException;
+import com.razonapro.razonaprobackend.shared.ids.AiUserCompetenceId;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
@@ -47,6 +50,7 @@ public class AiTriedService {
     private final AiTriedRepository         aiTriedRepository;
     private final AiTriedResponseRepository aiTriedResponseRepository;
     private final AiQuestionRepository      aiQuestionRepository;
+    private final AiUserCompetenceRepository aiUserCompetenceRepository;
     private final CompetenceRepository      competenceRepository;
     private final AiQuestionGenerator       questionGenerator;
     private final AiTutor                   aiTutor;
@@ -65,6 +69,20 @@ public class AiTriedService {
         AiTried at = getOrThrow(aiTriedId);
         assertOwnership(at, p);
         return AiTriedDto.from(at);
+    }
+
+    /** Admin: lista los intentos IA de un estudiante. */
+    public PagedResponse<AiTriedDto> findByStudent(String programId, String studentId, Pageable pageable) {
+        return PagedResponse.from(aiTriedRepository
+                .findByStudentIdAndProgramId(studentId, programId, pageable)
+                .map(AiTriedDto::from));
+    }
+
+    /** Admin: ve las preguntas que la IA generó en un intento (con la correcta revelada). */
+    public List<AiQuestionDto> questionsForAdmin(String aiTriedId) {
+        AiTried at = getOrThrow(aiTriedId);
+        return aiQuestionRepository.findByAiTriedIdOrderByQuestionOrderAsc(aiTriedId)
+                .stream().map(q -> toDto(q, at.getTotalQuestions(), true)).toList();
     }
 
     public List<AiQuestionDto> listQuestions(String aiTriedId, UserPrincipal p) {
@@ -110,19 +128,22 @@ public class AiTriedService {
         Competence comp = competenceRepository.findById(req.getCompetenceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Competencia", req.getCompetenceId()));
 
+        // IRT acumulativo: arrancamos desde el theta que el usuario trae en esta competencia.
+        double priorTheta = loadPriorTheta(p.getProgramId(), p.getId(), comp.getCompetenceId());
+
         AiTried at = AiTried.builder()
                 .programId(p.getProgramId())
                 .studentId(p.getId())
-                .aiTriedId(IdGenerator.aiTriedId())
+                .aiTriedId(IdGenerator.aiTriedId(aiTriedRepository.count()))
                 .competenceId(comp.getCompetenceId())
                 .totalQuestions(req.getTotalQuestions())
                 .description(req.getDescription())
-                .theta(BigDecimal.ZERO)
+                .theta(BigDecimal.valueOf(priorTheta).setScale(3, RoundingMode.HALF_UP))
                 .build();
         aiTriedRepository.save(at);
 
-        // Primera pregunta en dificultad 5 (media)
-        AiQuestion first = generateAndSave(at, comp, 1, 5);
+        // Primera pregunta en el nivel que corresponde al theta acumulado del usuario
+        AiQuestion first = generateAndSave(at, comp, 1, thetaToDifficulty(priorTheta));
         return new AiStartResponseDto(AiTriedDto.from(at), toDto(first, req.getTotalQuestions(), false), 1);
     }
 
@@ -140,8 +161,9 @@ public class AiTriedService {
         if (nextOrder > at.getTotalQuestions())
             throw new ApiException(ErrorCode.TRIED_ALREADY_FINISHED, "Ya se generaron todas las preguntas.");
 
-        // Calcular theta actualizado y determinar dificultad objetivo
-        double theta    = computeTheta(existing);
+        // Calcular theta actualizado (sembrado con el acumulado del usuario) y dificultad objetivo
+        double prior    = loadPriorTheta(at.getProgramId(), at.getStudentId(), at.getCompetenceId());
+        double theta    = computeTheta(existing, prior);
         int    target   = thetaToDifficulty(theta);
 
         Competence comp = competenceRepository.findById(at.getCompetenceId())
@@ -190,7 +212,7 @@ public class AiTriedService {
                 .programId(at.getProgramId())
                 .studentId(at.getStudentId())
                 .aiTriedId(aiTriedId)
-                .aiTriedResponseId(IdGenerator.aiTriedResponseId())
+                .aiTriedResponseId(IdGenerator.aiTriedResponseId(aiTriedResponseRepository.count()))
                 .questionText(truncate(q.getStatement(), 1990))
                 .studentAnswer(truncate(options.get(sel).text(), 290))
                 .correctAnswer(truncate(options.get(q.getCorrectIndex()).text(), 290))
@@ -213,11 +235,12 @@ public class AiTriedService {
         Double finalScore = null;
         int nextDiff = 0;
 
+        double prior = loadPriorTheta(at.getProgramId(), at.getStudentId(), at.getCompetenceId());
         if (finished) {
             finishAiTried(at, all);
             finalScore = at.getScore() != null ? at.getScore().doubleValue() : 0.0;
         } else {
-            double theta = computeTheta(all);
+            double theta = computeTheta(all, prior);
             nextDiff = thetaToDifficulty(theta);
             at.setTheta(BigDecimal.valueOf(theta).setScale(3, RoundingMode.HALF_UP));
         }
@@ -264,7 +287,7 @@ public class AiTriedService {
 
         q.setHintsUsed(Math.max(q.getHintsUsed(), req.getHintLevel()));
         aiQuestionRepository.save(q);
-        return new AiHintDto(hint, req.getHintLevel());
+        return new AiHintDto(clean(hint), req.getHintLevel());
     }
 
     // ── Finalizar manual ─────────────────────────────────────────────────
@@ -297,31 +320,43 @@ public class AiTriedService {
         if (batch.isEmpty()) throw new ApiException(ErrorCode.AI_BATCH_EMPTY);
 
         AiGeneratedQuestion g = batch.get(0);
+        List<AiOption> cleanedOptions = g.options().stream()
+                .map(o -> new AiOption(clean(o.text()), o.isCorrect()))
+                .toList();
         AiQuestion q = AiQuestion.builder()
-                .aiQuestionId(IdGenerator.aiQuestionId())
+                .aiQuestionId(IdGenerator.aiQuestionId(aiQuestionRepository.count()))
                 .programId(at.getProgramId())
                 .studentId(at.getStudentId())
                 .aiTriedId(at.getAiTriedId())
                 .competenceId(at.getCompetenceId())
                 .questionOrder(order)
-                .statement(g.statement())
-                .optionsJson(writeOptions(g.options()))
+                .statement(clean(g.statement()))
+                .optionsJson(writeOptions(cleanedOptions))
                 .correctIndex(g.correctIndex())
-                .explanation(g.explanation())
+                .explanation(clean(g.explanation()))
                 .difficultyLevel(Math.max(1, Math.min(10, g.difficultyLevel())))
                 .build();
         return aiQuestionRepository.save(q);
     }
 
-    /** Score basado en suma de dificultades (ponderado). */
+    /** Normaliza el texto de la IA: reemplaza guiones largos (— – ―) por uno normal (-). */
+    private static String clean(String s) {
+        if (s == null) return null;
+        return s.replace('—', '-')   // — em dash
+                .replace('–', '-')    // – en dash
+                .replace('―', '-');   // ― horizontal bar
+    }
+
+    /** Score ponderado por el nivel de cada pregunta (justo) y normalizado a 0–100. */
     private void finishAiTried(AiTried at, List<AiQuestion> questions) {
         at.setStatus("FINISHED");
         at.setFinishedAt(LocalDateTime.now());
 
-        int earned = 0, max = 0, correct = 0;
+        int earned = 0, max = 0, correct = 0, answered = 0;
         for (AiQuestion q : questions) {
             int pts = q.getDifficultyLevel() != null ? q.getDifficultyLevel() : 5;
             max += pts;
+            if (q.getSelectedIndex() != null) answered++;
             if (Boolean.TRUE.equals(q.getIsCorrect())) { earned += pts; correct++; }
         }
         at.setCorrectAnswers(correct);
@@ -330,6 +365,36 @@ public class AiTriedService {
                 .divide(BigDecimal.valueOf(max), 4, RoundingMode.HALF_UP)
                 .multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO);
+
+        // IRT acumulativo: actualizar el theta del usuario en esta competencia
+        double prior = loadPriorTheta(at.getProgramId(), at.getStudentId(), at.getCompetenceId());
+        double finalTheta = computeTheta(questions, prior);
+        at.setTheta(BigDecimal.valueOf(finalTheta).setScale(3, RoundingMode.HALF_UP));
+        persistTheta(at, finalTheta, answered);
+    }
+
+    /** Lee el theta acumulado del usuario en la competencia (0.0 si no existe). */
+    private double loadPriorTheta(String programId, String studentId, String competenceId) {
+        return aiUserCompetenceRepository
+                .findById(new AiUserCompetenceId(programId, studentId, competenceId))
+                .map(u -> u.getTheta().doubleValue())
+                .orElse(0.0);
+    }
+
+    /** Upsert del theta acumulado del usuario tras finalizar un intento. */
+    private void persistTheta(AiTried at, double theta, int answeredDelta) {
+        AiUserCompetenceId id = new AiUserCompetenceId(
+                at.getProgramId(), at.getStudentId(), at.getCompetenceId());
+        AiUserCompetence u = aiUserCompetenceRepository.findById(id).orElseGet(() ->
+                AiUserCompetence.builder()
+                        .programId(at.getProgramId())
+                        .studentId(at.getStudentId())
+                        .competenceId(at.getCompetenceId())
+                        .build());
+        u.setTheta(BigDecimal.valueOf(Math.max(-3.0, Math.min(3.0, theta)))
+                .setScale(3, RoundingMode.HALF_UP));
+        u.setAnsweredTotal((u.getAnsweredTotal() == null ? 0 : u.getAnsweredTotal()) + Math.max(0, answeredDelta));
+        aiUserCompetenceRepository.save(u);
     }
 
     /** Retorna [earnedPoints, maxPoints] para el set actual de preguntas. */
@@ -343,9 +408,9 @@ public class AiTriedService {
         return new int[]{earned, max};
     }
 
-    /** Estimación theta con IRT 1PL simplificado. */
-    private double computeTheta(List<AiQuestion> questions) {
-        double theta = 0.0;
+    /** Estimación theta con IRT 1PL simplificado, sembrada con el theta previo (acumulativo). */
+    private double computeTheta(List<AiQuestion> questions, double seed) {
+        double theta = Math.max(-3.0, Math.min(3.0, seed));
         for (AiQuestion q : questions) {
             if (q.getSelectedIndex() == null) continue;
             double b = (q.getDifficultyLevel() - 5.5) * (6.0 / 9.0);

@@ -1,72 +1,90 @@
 package com.razonapro.razonaprobackend.shared.exception;
 
-import lombok.Getter;
 import org.springframework.http.HttpStatus;
 
-@Getter
+/**
+ * Catálogo de errores de negocio de la aplicación.
+ * <p>
+ * El "código" que viaja al cliente es el NOMBRE del enum ({@link #name()}),
+ * que es estable, semántico y único por construcción — no se mantienen
+ * identificadores arbitrarios. Cada error declara su estado HTTP y un mensaje
+ * por defecto en español.
+ */
 public enum ErrorCode {
 
-    // ── Autenticación / Autorización ──────────────────────────────────────
-    INVALID_CREDENTIALS       ("AUTH-001", HttpStatus.UNAUTHORIZED, "Credenciales incorrectas"),
-    ACCOUNT_DISABLED          ("AUTH-002", HttpStatus.FORBIDDEN,    "Cuenta deshabilitada"),
-    EMAIL_NOT_VERIFIED        ("AUTH-003", HttpStatus.FORBIDDEN,    "Debes verificar tu correo"),
-    TOKEN_INVALID             ("AUTH-004", HttpStatus.BAD_REQUEST,  "Token inválido o expirado"),
-    TOKEN_ALREADY_USED        ("AUTH-005", HttpStatus.BAD_REQUEST,  "Token ya utilizado"),
-    INVALID_LOGIN_CODE        ("AUTH-006", HttpStatus.UNAUTHORIZED, "Formato de código inválido"),
-    INSUFFICIENT_PERMS        ("AUTH-007", HttpStatus.FORBIDDEN,    "Sin permisos para esta acción"),
-    TOO_MANY_REQUESTS         ("AUTH-008", HttpStatus.TOO_MANY_REQUESTS, "Demasiados intentos, espera un momento"),
-    TRIED_NOT_FINISHED ("BIZ-009", HttpStatus.BAD_REQUEST, "El intento no ha sido finalizado"),
+    // ── Autenticación / Autorización (401 / 403) ──────────────────────────
+    UNAUTHENTICATED           (HttpStatus.UNAUTHORIZED,      "Debes iniciar sesión para continuar."),
+    INVALID_CREDENTIALS       (HttpStatus.UNAUTHORIZED,      "Credenciales incorrectas."),
+    INVALID_LOGIN_CODE        (HttpStatus.UNAUTHORIZED,      "El formato del código de acceso es inválido."),
+    ACCOUNT_DISABLED          (HttpStatus.FORBIDDEN,         "Tu cuenta está deshabilitada."),
+    EMAIL_NOT_VERIFIED        (HttpStatus.FORBIDDEN,         "Debes verificar tu correo antes de continuar."),
+    EMAIL_ALREADY_VERIFIED    (HttpStatus.CONFLICT,          "Tu correo ya está verificado."),
+    INSUFFICIENT_PERMS        (HttpStatus.FORBIDDEN,         "No tienes permisos para esta acción."),
+    TOKEN_INVALID             (HttpStatus.BAD_REQUEST,       "El enlace es inválido o expiró."),
+    TOKEN_ALREADY_USED        (HttpStatus.BAD_REQUEST,       "Este enlace ya fue utilizado."),
+    TOO_MANY_REQUESTS         (HttpStatus.TOO_MANY_REQUESTS, "Demasiados intentos. Espera un momento."),
 
-    // ── Validación ────────────────────────────────────────────────────────
-    VALIDATION_FAILED         ("VAL-001",  HttpStatus.BAD_REQUEST,  "Errores de validación"),
-    INVALID_INPUT             ("VAL-002",  HttpStatus.BAD_REQUEST,  "Entrada inválida"),
+    // ── Validación (400) ──────────────────────────────────────────────────
+    VALIDATION_FAILED         (HttpStatus.BAD_REQUEST,       "Hay errores de validación."),
+    INVALID_INPUT             (HttpStatus.BAD_REQUEST,       "La información enviada no es válida."),
+    MALFORMED_REQUEST         (HttpStatus.BAD_REQUEST,       "La solicitud está mal formada."),
+    METHOD_NOT_ALLOWED        (HttpStatus.METHOD_NOT_ALLOWED,"Método no permitido para este recurso."),
 
-    // ── Recursos ──────────────────────────────────────────────────────────
-    RESOURCE_NOT_FOUND        ("RES-001",  HttpStatus.NOT_FOUND,    "Recurso no encontrado"),
+    // ── Recursos (404) ────────────────────────────────────────────────────
+    RESOURCE_NOT_FOUND        (HttpStatus.NOT_FOUND,         "Recurso no encontrado."),
+    ENDPOINT_NOT_FOUND        (HttpStatus.NOT_FOUND,         "La ruta solicitada no existe."),
 
-    // ── Conflictos ────────────────────────────────────────────────────────
-    EMAIL_ALREADY_EXISTS      ("CFL-001",  HttpStatus.CONFLICT,     "El email ya está registrado"),
-    CODE_ALREADY_EXISTS       ("CFL-002",  HttpStatus.CONFLICT,     "El código ya está registrado"),
-    PHONE_ALREADY_EXISTS      ("CFL-003",  HttpStatus.CONFLICT,     "El teléfono ya está registrado"),
-    DUPLICATE_RESOURCE        ("CFL-004",  HttpStatus.CONFLICT,     "Recurso duplicado"),
+    // ── Conflictos (409) ──────────────────────────────────────────────────
+    EMAIL_ALREADY_EXISTS      (HttpStatus.CONFLICT,          "El correo ya está registrado."),
+    CODE_ALREADY_EXISTS       (HttpStatus.CONFLICT,          "El código ya está registrado."),
+    PHONE_ALREADY_EXISTS      (HttpStatus.CONFLICT,          "El teléfono ya está registrado."),
+    DUPLICATE_RESOURCE        (HttpStatus.CONFLICT,          "El recurso ya existe."),
+    DATA_INTEGRITY_VIOLATION  (HttpStatus.CONFLICT,          "La operación viola una restricción de datos."),
 
-    // ── Negocio ───────────────────────────────────────────────────────────
-    TEST_NO_QUESTIONS         ("BIZ-001",  HttpStatus.BAD_REQUEST,  "El test no tiene preguntas activas"),
-    TRIED_ALREADY_FINISHED    ("BIZ-002",  HttpStatus.CONFLICT,     "El intento ya fue finalizado"),
-    QUESTION_ALREADY_ANSWERED ("BIZ-003",  HttpStatus.CONFLICT,     "Ya respondiste esta pregunta"),
-    PROGRAM_NOT_FOUND         ("BIZ-004",  HttpStatus.BAD_REQUEST,  "El código no corresponde a ningún programa registrado"),
-    QUESTION_NO_CORRECT_OPTION("BIZ-005",  HttpStatus.BAD_REQUEST,  "Debe haber al menos una opción correcta"),
-    TRIED_IN_PROGRESS         ("BIZ-006",  HttpStatus.CONFLICT,     "Ya tienes un intento en progreso para este test"),
-    TEST_DISABLED             ("BIZ-007",  HttpStatus.BAD_REQUEST,  "El test no está disponible"),
-    INVALID_OPTION            ("BIZ-008",  HttpStatus.BAD_REQUEST,  "Opción no válida para esta pregunta"),
+    // ── Negocio (4xx) ─────────────────────────────────────────────────────
+    PROGRAM_NOT_FOUND         (HttpStatus.BAD_REQUEST,       "El código no corresponde a ningún programa registrado."),
+    TEST_NO_QUESTIONS         (HttpStatus.BAD_REQUEST,       "El test no tiene preguntas activas."),
+    TEST_DISABLED             (HttpStatus.BAD_REQUEST,       "El test no está disponible."),
+    QUESTION_NO_CORRECT_OPTION(HttpStatus.BAD_REQUEST,       "Debe haber al menos una opción correcta."),
+    INVALID_OPTION            (HttpStatus.BAD_REQUEST,       "Opción no válida para esta pregunta."),
+    TRIED_NOT_FINISHED        (HttpStatus.BAD_REQUEST,       "El intento aún no ha finalizado."),
+    TRIED_ALREADY_FINISHED    (HttpStatus.CONFLICT,          "El intento ya fue finalizado."),
+    TRIED_IN_PROGRESS         (HttpStatus.CONFLICT,          "Ya tienes un intento en progreso para este test."),
+    QUESTION_ALREADY_ANSWERED (HttpStatus.CONFLICT,          "Ya respondiste esta pregunta."),
+    RESEND_TOO_SOON           (HttpStatus.TOO_MANY_REQUESTS, "Espera un momento antes de reenviar el correo."),
 
-    // ── Servidor ──────────────────────────────────────────────────────────
-    INTERNAL_ERROR            ("SRV-001",  HttpStatus.INTERNAL_SERVER_ERROR, "Error interno del servidor"),
-    EXTERNAL_SERVICE_DOWN     ("SRV-002",  HttpStatus.SERVICE_UNAVAILABLE,   "Servicio externo no disponible"),
+    // ── Módulo de IA (4xx / 503) ──────────────────────────────────────────
+    AI_MODULE_DISABLED        (HttpStatus.SERVICE_UNAVAILABLE, "El módulo de IA no está habilitado. Contacta al administrador."),
+    AI_TUTOR_DISABLED         (HttpStatus.SERVICE_UNAVAILABLE, "El tutor IA no está disponible actualmente."),
+    AI_GENERATION_FAILED      (HttpStatus.SERVICE_UNAVAILABLE, "Error al generar la pregunta con IA. Intenta nuevamente."),
+    AI_BATCH_EMPTY            (HttpStatus.SERVICE_UNAVAILABLE, "La IA no devolvió preguntas válidas. Intenta de nuevo."),
+    AI_SESSION_NOT_FOUND      (HttpStatus.NOT_FOUND,           "Sesión de IA no encontrada o expirada. Inicia una nueva práctica."),
+    AI_QUESTION_NOT_FOUND     (HttpStatus.NOT_FOUND,           "Pregunta IA no encontrada en esta sesión."),
+    AI_QUESTION_NOT_MATCH     (HttpStatus.BAD_REQUEST,         "La pregunta no corresponde a la sesión activa."),
+    AI_INVALID_OPTION         (HttpStatus.BAD_REQUEST,         "Opción de respuesta inválida."),
+    AI_ALREADY_ANSWERED       (HttpStatus.CONFLICT,            "Esta pregunta ya fue respondida."),
+    HINT_LIMIT_REACHED        (HttpStatus.CONFLICT,            "Ya alcanzaste el máximo de pistas para esta pregunta."),
 
-    // Agregar al enum ErrorCode.java (en la sección Negocio):
+    // ── Otros recursos (404) ──────────────────────────────────────────────
+    DOUBT_NOT_FOUND           (HttpStatus.NOT_FOUND,         "Reporte de duda no encontrado."),
+    NOTIFICATION_NOT_FOUND    (HttpStatus.NOT_FOUND,         "Notificación no encontrada."),
 
+    // ── Servidor (5xx) ────────────────────────────────────────────────────
+    INTERNAL_ERROR            (HttpStatus.INTERNAL_SERVER_ERROR, "Ocurrió un error interno. Inténtalo más tarde."),
+    EXTERNAL_SERVICE_DOWN     (HttpStatus.SERVICE_UNAVAILABLE,   "Un servicio externo no está disponible.");
 
-    AI_MODULE_DISABLED    ("BIZ-009", HttpStatus.SERVICE_UNAVAILABLE,    "El módulo de IA no está habilitado. Contacta al administrador."),
-    AI_GENERATION_FAILED  ("BIZ-010", HttpStatus.SERVICE_UNAVAILABLE,    "Error al generar la pregunta con IA. Intenta nuevamente."),
-    AI_SESSION_NOT_FOUND  ("BIZ-011", HttpStatus.NOT_FOUND,              "Sesión de IA no encontrada o expirada. Inicia una nueva práctica."),
-    AI_QUESTION_NOT_MATCH ("BIZ-012", HttpStatus.BAD_REQUEST,            "La pregunta no corresponde a la sesión activa."),
-    AI_ALREADY_ANSWERED   ("BIZ-013", HttpStatus.CONFLICT,               "Esta pregunta ya fue respondida."),
-    AI_INVALID_OPTION     ("BIZ-014", HttpStatus.BAD_REQUEST,            "Opción de respuesta inválida."),
-    AI_TUTOR_DISABLED     ("BIZ-015", HttpStatus.SERVICE_UNAVAILABLE,    "El tutor IA no está disponible actualmente."),
-    AI_BATCH_EMPTY        ("BIZ-016", HttpStatus.SERVICE_UNAVAILABLE, "La IA no devolvió preguntas válidas. Intenta de nuevo."),
-    AI_QUESTION_NOT_FOUND ("BIZ-017", HttpStatus.NOT_FOUND,           "Pregunta IA no encontrada en esta sesión."),
-    HINT_LIMIT_REACHED    ("BIZ-018", HttpStatus.CONFLICT,            "Ya alcanzaste el máximo de pistas para esta pregunta."),
-    DOUBT_NOT_FOUND       ("BIZ-019", HttpStatus.NOT_FOUND,          "Reporte de duda no encontrado."),
-    NOTIFICATION_NOT_FOUND("BIZ-020", HttpStatus.NOT_FOUND,          "Notificación no encontrada.");
-
-    private final String     code;
     private final HttpStatus status;
     private final String     defaultMessage;
 
-    ErrorCode(String code, HttpStatus status, String defaultMessage) {
-        this.code = code;
+    ErrorCode(HttpStatus status, String defaultMessage) {
         this.status = status;
         this.defaultMessage = defaultMessage;
     }
+
+    /** Código estable y semántico que viaja al cliente (el nombre del enum). */
+    public String getCode() { return name(); }
+
+    public HttpStatus getStatus() { return status; }
+
+    public String getDefaultMessage() { return defaultMessage; }
 }

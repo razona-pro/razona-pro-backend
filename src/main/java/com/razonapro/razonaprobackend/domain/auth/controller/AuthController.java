@@ -1,10 +1,12 @@
 package com.razonapro.razonaprobackend.domain.auth.controller;
 
+import com.razonapro.razonaprobackend.domain.auth.dto.request.ResendVerificationRequest;
 import com.razonapro.razonaprobackend.domain.auth.dto.request.ResetPasswordRequest;
 import com.razonapro.razonaprobackend.domain.auth.dto.request.StudentRegisterRequest;
 import com.razonapro.razonaprobackend.domain.auth.dto.request.UnifiedForgotPasswordRequest;
 import com.razonapro.razonaprobackend.domain.auth.dto.request.UnifiedLoginRequest;
 import com.razonapro.razonaprobackend.domain.auth.dto.response.AuthResponse;
+import com.razonapro.razonaprobackend.domain.auth.dto.response.ResendVerificationResponse;
 import com.razonapro.razonaprobackend.domain.auth.service.AuthService;
 import com.razonapro.razonaprobackend.domain.student.dto.response.StudentDto;
 import com.razonapro.razonaprobackend.shared.dto.ApiResponse;
@@ -43,6 +45,15 @@ public class AuthController {
     public ResponseEntity<ApiResponse<Void>> verifyEmail(@RequestParam String token) {
         authService.verifyEmail(token);
         return ResponseEntity.ok(ApiResponse.ok("Correo verificado exitosamente."));
+    }
+
+    @PostMapping("/resend-verification")
+    @Operation(summary = "Reenvía el correo de verificación (con límite de frecuencia)")
+    public ResponseEntity<ApiResponse<ResendVerificationResponse>> resendVerification(
+            @Valid @RequestBody ResendVerificationRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                "Si el correo está registrado y sin verificar, te enviamos un nuevo enlace.",
+                authService.resendVerification(req.getEmail())));
     }
 
     @PostMapping("/forgot-password")

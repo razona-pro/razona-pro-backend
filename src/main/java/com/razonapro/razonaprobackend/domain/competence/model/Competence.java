@@ -41,7 +41,7 @@ public class Competence implements Normalizable {
     @Override
     public void normalize() {
         competenceId   = StringNormalizer.upper(competenceId);
-        competenceName = StringNormalizer.upper(competenceName);
-        description    = StringNormalizer.upper(description);
+        competenceName = StringNormalizer.trim(competenceName);
+        description    = StringNormalizer.trim(description);
     }
 }

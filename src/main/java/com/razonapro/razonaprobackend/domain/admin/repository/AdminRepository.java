@@ -11,6 +11,10 @@ public interface AdminRepository extends JpaRepository<Admin, String> {
     Optional<Admin> findByEmail(String email);
     boolean existsByEmail(String email);
     boolean existsByPhone(String phone);
+
+    // Variantes case-insensitive: el email se compara sin importar mayúsculas/minúsculas.
+    Optional<Admin> findByEmailIgnoreCase(String email);
+    boolean existsByEmailIgnoreCase(String email);
     long countByIsActiveTrue();
     long countByIsActiveFalse();
 

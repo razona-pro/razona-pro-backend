@@ -66,6 +66,16 @@ public class QuestionController {
                 .body(ApiResponse.ok(questionService.create(competenceId, req, principal)));
     }
 
+    /** Agrega al banco una pregunta generada por la IA (admin) */
+    @PostMapping("/api/questions/from-ai/{aiQuestionId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<QuestionDto>> createFromAi(
+            @PathVariable String aiQuestionId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(
+                "Pregunta agregada al banco", questionService.createFromAiQuestion(aiQuestionId, principal)));
+    }
+
     @PutMapping("/api/competences/{competenceId}/questions/{questionId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<QuestionDto>> update(

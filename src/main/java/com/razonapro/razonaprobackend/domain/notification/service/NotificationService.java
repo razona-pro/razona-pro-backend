@@ -62,7 +62,7 @@ public class NotificationService {
     public void notify(String recipientId, String recipientType, String type,
                        String title, String body, String link) {
         repo.save(Notification.builder()
-                .notificationId(IdGenerator.notificationId())
+                .notificationId(IdGenerator.notificationId(repo.count()))
                 .recipientId(recipientId).recipientType(recipientType)
                 .type(type).title(title).body(body).link(link)
                 .build());
@@ -75,9 +75,11 @@ public class NotificationService {
         List<Student> students = studentRepository.findByIsActiveTrue();
         String title = "Nuevo test disponible";
         String body  = "Se publicó \"" + testName + "\" en " + competenceName + ". ¡Practica ya!";
+        long base = repo.count();
+        int i = 0;
         for (Student s : students) {
             repo.save(Notification.builder()
-                    .notificationId(IdGenerator.notificationId())
+                    .notificationId(IdGenerator.notificationId(base + i++))
                     .recipientId(s.getStudentId()).recipientType("STUDENT")
                     .type("NEW_TEST").title(title).body(body).link("/tests")
                     .build());

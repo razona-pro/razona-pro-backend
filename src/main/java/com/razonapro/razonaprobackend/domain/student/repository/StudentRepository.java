@@ -22,6 +22,10 @@ public interface StudentRepository extends JpaRepository<Student, StudentId> {
     boolean existsByEmail(String email);
     boolean existsByPhone(String phone);
 
+    // Variantes case-insensitive: el email se compara sin importar mayúsculas/minúsculas.
+    Optional<Student> findByEmailIgnoreCase(String email);
+    boolean existsByEmailIgnoreCase(String email);
+
     long countByIsActiveTrue();
     long countByIsActiveFalse();
     List<Student> findByIsActiveTrue();
@@ -39,7 +43,7 @@ public interface StudentRepository extends JpaRepository<Student, StudentId> {
                LOWER(s.firstName)    LIKE LOWER(CONCAT('%',:search,'%')) OR
                LOWER(s.firstSurname) LIKE LOWER(CONCAT('%',:search,'%')) OR
                LOWER(s.email)        LIKE LOWER(CONCAT('%',:search,'%')))
-          AND (:programId IS NULL OR s.programId = :programId)
+          AND (:programId IS NULL OR LOWER(s.programId) = LOWER(:programId))
           AND (:statusFilter = '' OR
                (:statusFilter = 'active'   AND s.isActive      = true)  OR
                (:statusFilter = 'inactive' AND s.isActive      = false) OR

@@ -40,7 +40,8 @@ public class Test implements Normalizable {
     @Column(name = "description", length = 100)
     private String description;
 
-    @Column(name = "duration_seconds", nullable = false)
+    /** NULL = sin tiempo (solo permitido en modo PRACTICE). */
+    @Column(name = "duration_seconds")
     private Integer durationSeconds;
 
     @Column(name = "is_active", columnDefinition = "CHAR(1)", nullable = false)
@@ -67,7 +68,7 @@ public class Test implements Normalizable {
 
     @Override
     public void normalize() {
-        testName    = StringNormalizer.upper(testName);
-        description = StringNormalizer.upper(description);
+        testName    = StringNormalizer.trim(testName);
+        description = StringNormalizer.trim(description);
     }
 }

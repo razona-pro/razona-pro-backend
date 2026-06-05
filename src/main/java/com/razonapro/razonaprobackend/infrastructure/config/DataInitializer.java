@@ -32,7 +32,7 @@ public class DataInitializer implements CommandLineRunner {
 
     private void initSuperAdmin() {
         AppProperties.AdminInitializer cfg = appProperties.getAdminInitializer();
-        String email = StringNormalizer.upper(cfg.getEmail());
+        String email = StringNormalizer.lower(cfg.getEmail());
         if (adminRepository.existsByEmail(email)) {
             log.info("Super admin ya existe: {}", email);
             return;
@@ -40,8 +40,8 @@ public class DataInitializer implements CommandLineRunner {
         log.info("Creando super admin: {}", email);
         Admin admin = Admin.builder()
                 .adminId(IdGenerator.adminId(adminRepository.count()))
-                .firstName(StringNormalizer.upper(cfg.getFirstName()))
-                .firstSurname(StringNormalizer.upper(cfg.getLastName()))
+                .firstName(StringNormalizer.trim(cfg.getFirstName()))
+                .firstSurname(StringNormalizer.trim(cfg.getLastName()))
                 .email(email)
                 .phone(StringNormalizer.trim(cfg.getPhone() != null ? cfg.getPhone() : "+573000000000"))
                 .passwordHash(passwordEncoder.encode(cfg.getPassword()))

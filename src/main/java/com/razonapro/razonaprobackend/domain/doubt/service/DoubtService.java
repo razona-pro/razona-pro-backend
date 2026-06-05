@@ -41,7 +41,7 @@ public class DoubtService {
         String statement = resolveStatement(req);
 
         QuestionDoubt d = repo.save(QuestionDoubt.builder()
-                .doubtId(IdGenerator.doubtId())
+                .doubtId(IdGenerator.doubtId(repo.count()))
                 .studentId(p.getId()).programId(p.getProgramId())
                 .source(req.getSource()).competenceId(req.getCompetenceId())
                 .questionId(req.getQuestionId()).aiQuestionId(req.getAiQuestionId())

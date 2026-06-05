@@ -66,11 +66,11 @@ public class Admin implements Normalizable {
     @Override
     public void normalize() {
         adminId       = StringNormalizer.upper(adminId);
-        firstName     = StringNormalizer.upper(firstName);
-        secondName    = StringNormalizer.upper(secondName);
-        firstSurname  = StringNormalizer.upper(firstSurname);
-        secondSurname = StringNormalizer.upper(secondSurname);
-        email         = StringNormalizer.upper(email);
+        firstName     = StringNormalizer.trim(firstName);
+        secondName    = StringNormalizer.trim(secondName);
+        firstSurname  = StringNormalizer.trim(firstSurname);
+        secondSurname = StringNormalizer.trim(secondSurname);
+        email         = StringNormalizer.lower(email);
         phone         = StringNormalizer.trim(phone);
     }
 }

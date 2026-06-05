@@ -2,6 +2,7 @@ package com.razonapro.razonaprobackend.infrastructure.config;
 
 import com.razonapro.razonaprobackend.infrastructure.security.AuthRateLimitFilter;
 import com.razonapro.razonaprobackend.infrastructure.security.JwtAuthenticationFilter;
+import com.razonapro.razonaprobackend.infrastructure.security.RestAuthExceptionHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -26,6 +27,7 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter   jwtFilter;
     private final AuthRateLimitFilter       rateLimitFilter;
     private final CorsConfigurationSource   corsConfigurationSource;
+    private final RestAuthExceptionHandler  restAuthExceptionHandler;
 
     private static final String[] PUBLIC_ENDPOINTS = {
             "/api/health",
@@ -48,6 +50,9 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(e -> e
+                        .authenticationEntryPoint(restAuthExceptionHandler)  // 401 en formato ApiResponse
+                        .accessDeniedHandler(restAuthExceptionHandler))      // 403 en formato ApiResponse
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()

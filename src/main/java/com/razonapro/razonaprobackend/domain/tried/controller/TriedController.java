@@ -3,6 +3,7 @@ package com.razonapro.razonaprobackend.domain.tried.controller;
 import com.razonapro.razonaprobackend.domain.tried.dto.request.StartTriedRequest;
 import com.razonapro.razonaprobackend.domain.tried.dto.request.SubmitAnswerRequest;
 import com.razonapro.razonaprobackend.domain.tried.dto.response.TriedDto;
+import com.razonapro.razonaprobackend.domain.tried.dto.response.TriedResumeDto;
 import com.razonapro.razonaprobackend.domain.tried.dto.response.TriedReviewDto;
 import com.razonapro.razonaprobackend.domain.tried.service.TriedService;
 import com.razonapro.razonaprobackend.infrastructure.security.UserPrincipal;
@@ -76,6 +77,24 @@ public class TriedController {
             @Valid @RequestBody SubmitAnswerRequest req,
             @AuthenticationPrincipal UserPrincipal principal) {
         return ResponseEntity.ok(ApiResponse.ok(triedService.submitAnswer(triedId, req, principal)));
+    }
+
+    @GetMapping("/{triedId}/resume")
+    @PreAuthorize("hasRole('STUDENT')")
+    @Operation(summary = "Reanuda un intento; el tiempo corre desde el inicio (server-authoritative)")
+    public ResponseEntity<ApiResponse<TriedResumeDto>> resume(
+            @PathVariable String triedId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(ApiResponse.ok(triedService.resume(triedId, principal)));
+    }
+
+    @PostMapping("/{triedId}/fraud")
+    @PreAuthorize("hasRole('STUDENT')")
+    @Operation(summary = "Registra un evento sospechoso; anula el intento si supera el límite")
+    public ResponseEntity<ApiResponse<TriedDto>> reportFraud(
+            @PathVariable String triedId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(ApiResponse.ok(triedService.reportFraud(triedId, principal)));
     }
 
     @PutMapping("/{triedId}/finish")

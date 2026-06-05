@@ -11,7 +11,10 @@ import com.razonapro.razonaprobackend.domain.test.repository.TestQuestionReposit
 import com.razonapro.razonaprobackend.domain.test.repository.TestRepository;
 import com.razonapro.razonaprobackend.domain.tried.dto.request.StartTriedRequest;
 import com.razonapro.razonaprobackend.domain.tried.dto.request.SubmitAnswerRequest;
+import com.razonapro.razonaprobackend.domain.admin.repository.AdminRepository;
+import com.razonapro.razonaprobackend.domain.notification.service.NotificationService;
 import com.razonapro.razonaprobackend.domain.tried.dto.response.TriedDto;
+import com.razonapro.razonaprobackend.domain.tried.dto.response.TriedResumeDto;
 import com.razonapro.razonaprobackend.domain.tried.dto.response.TriedReviewDto;
 import com.razonapro.razonaprobackend.domain.tried.model.StudentResponse;
 import com.razonapro.razonaprobackend.domain.tried.model.Tried;
@@ -52,6 +55,11 @@ public class TriedService {
     private final OptionRepository          optionRepository;
     private final QuestionRepository        questionRepository;
     private final StudentRepository         studentRepository;
+    private final NotificationService       notificationService;
+    private final AdminRepository           adminRepository;
+
+    /** Nº de eventos sospechosos antes de anular el intento por fraude. */
+    private static final int FRAUD_LIMIT = 3;
 
     // ── Consultas ────────────────────────────────────────────────────────
 
@@ -190,7 +198,7 @@ public class TriedService {
                 .testId(req.getTestId())
                 .programId(principal.getProgramId())
                 .studentId(principal.getId())
-                .triedId(IdGenerator.triedId())
+                .triedId(IdGenerator.triedId(triedRepository.count()))
                 .totalQuestions(selected.size())
                 .build();
         triedRepository.save(tried);
@@ -249,7 +257,7 @@ public class TriedService {
             responseRepository.save(sr);
         } else {
             responseRepository.save(StudentResponse.builder()
-                    .studentResponseId(IdGenerator.studentResponseId())
+                    .studentResponseId(IdGenerator.studentResponseId(responseRepository.count()))
                     .competenceId(tried.getCompetenceId())
                     .testId(tried.getTestId())
                     .programId(tried.getProgramId())
@@ -284,6 +292,91 @@ public class TriedService {
         return TriedDto.from(triedRepository.save(tried));
     }
 
+    // ── Reanudar intento (tiempo autoritativo del servidor) ──────────────
+
+    /**
+     * Reanuda un intento IN_PROGRESS. El tiempo SIEMPRE corre desde attempt_timestamp:
+     * si ya expiró (test con duración), se marca ABANDONED. La práctica (sin duración)
+     * nunca expira.
+     */
+    @Transactional
+    public TriedResumeDto resume(String triedId, UserPrincipal principal) {
+        Tried tried = triedRepository.findByTriedId(triedId)
+                .orElseThrow(() -> new ResourceNotFoundException("Intento", triedId));
+        assertOwnership(tried, principal);
+
+        Test test = testRepository.findById(new TestPK(tried.getTestId(), tried.getCompetenceId()))
+                .orElse(null);
+        Integer duration = (test != null) ? test.getDurationSeconds() : null;
+
+        if (!"IN_PROGRESS".equals(tried.getStatus()))
+            return TriedResumeDto.of(tried, 0, duration, false, true);
+
+        // Práctica sin tiempo: nunca expira
+        if (duration == null)
+            return TriedResumeDto.of(tried, null, null, false, false);
+
+        long elapsed   = java.time.Duration.between(tried.getAttemptTimestamp(), LocalDateTime.now()).getSeconds();
+        long remaining = duration - elapsed;
+
+        if (remaining <= 0) {
+            tried.setStatus("ABANDONED");
+            tried.setFinishedAt(LocalDateTime.now());
+            tried.setTimeSpentSeconds((int) Math.min(elapsed, duration));
+            triedRepository.save(tried);
+            return TriedResumeDto.of(tried, 0, duration, true, true);
+        }
+
+        return TriedResumeDto.of(tried, (int) remaining, duration, false, false);
+    }
+
+    // ── Fraude: registrar evento y anular si supera el límite ────────────
+
+    /**
+     * Registra un evento sospechoso (cambio de pestaña, salir de pantalla, etc.).
+     * Al superar FRAUD_LIMIT, el intento se anula (ANULADO) y se notifica a los admins.
+     * No aplica en modo PRACTICE (la práctica es libre).
+     */
+    @Transactional
+    public TriedDto reportFraud(String triedId, UserPrincipal principal) {
+        Tried tried = triedRepository.findByTriedId(triedId)
+                .orElseThrow(() -> new ResourceNotFoundException("Intento", triedId));
+        assertOwnership(tried, principal);
+
+        if (!"IN_PROGRESS".equals(tried.getStatus()))
+            return TriedDto.from(tried);
+
+        Test test = testRepository.findById(new TestPK(tried.getTestId(), tried.getCompetenceId()))
+                .orElse(null);
+        if (test == null || "PRACTICE".equals(test.getTestMode()))
+            return TriedDto.from(tried);  // la práctica no penaliza
+
+        int count = (tried.getFraudAttempts() == null ? 0 : tried.getFraudAttempts()) + 1;
+        tried.setFraudAttempts(count);
+
+        if (count >= FRAUD_LIMIT) {
+            tried.setStatus("ANULADO");
+            tried.setFinishedAt(LocalDateTime.now());
+            notifyAdminsFraud(tried, principal);
+        }
+        return TriedDto.from(triedRepository.save(tried));
+    }
+
+    private void notifyAdminsFraud(Tried tried, UserPrincipal principal) {
+        String studentName = studentRepository.findByStudentId(principal.getId())
+                .map(s -> (s.getFirstName() + " " + s.getFirstSurname()).trim())
+                .orElse(principal.getId());
+        String testName = (tried.getTest() != null) ? tried.getTest().getTestName() : tried.getTestId();
+        adminRepository.findAll().stream()
+                .filter(a -> Boolean.TRUE.equals(a.getIsActive()))
+                .forEach(a -> notificationService.notify(
+                        a.getAdminId(), "ADMIN", "FRAUD_ALERT",
+                        "Intento anulado por fraude",
+                        "El estudiante " + studentName + " (" + principal.getId() + ") fue anulado por fraude en el test \""
+                                + testName + "\" tras " + tried.getFraudAttempts() + " eventos sospechosos.",
+                        "/admin/students"));
+    }
+
     // ── Helpers privados ─────────────────────────────────────────────────
 
     private void finishTried(Tried tried) {
@@ -293,36 +386,18 @@ public class TriedService {
         List<StudentResponse> responses = responseRepository
                 .findByTriedIdAndOptionIdIsNotNull(tried.getTriedId());
 
-        int totalPoints = 0, earnedPoints = 0;
-        for (StudentResponse sr : responses) {
-            Question q = questionRepository
-                    .findById(new QuestionId(tried.getCompetenceId(), sr.getQuestionId()))
-                    .orElse(null);
-            int pts = (q != null) ? difficultyPoints(q.getDifficultyLevel()) : 3;
-            totalPoints += pts;
-            if (Boolean.TRUE.equals(sr.getIsCorrect())) earnedPoints += pts;
-        }
-
-        // Si no respondió ninguna, score = 0
-        if (totalPoints > 0) {
-            BigDecimal score = BigDecimal.valueOf(earnedPoints)
-                    .divide(BigDecimal.valueOf(totalPoints), 4, RoundingMode.HALF_UP)
-                    .multiply(BigDecimal.valueOf(100))
-                    .setScale(2, RoundingMode.HALF_UP);
-            tried.setScore(score);
-        } else {
-            tried.setScore(BigDecimal.ZERO);
-        }
-
         long correct = responses.stream().filter(r -> Boolean.TRUE.equals(r.getIsCorrect())).count();
         tried.setCorrectAnswers((int) correct);
-    }
-    private int difficultyPoints(String level) {
-        return switch (level == null ? "M" : level) {
-            case "B" -> 1;
-            case "A" -> 5;
-            default  -> 3;
-        };
+
+        // Test estático = % sobre 100 ("respondiste X de Y"). No pondera por dificultad
+        // (la Saber Pro no la maneja). El trigger fn_calculate_tried_score lo recalcula
+        // igual al persistir, pero lo dejamos coherente en la app.
+        int total = tried.getTotalQuestions() != null ? tried.getTotalQuestions() : 0;
+        tried.setScore(total > 0
+                ? BigDecimal.valueOf(correct)
+                        .divide(BigDecimal.valueOf(total), 4, RoundingMode.HALF_UP)
+                        .multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO);
     }
 
     private void assertOwnership(Tried tried, UserPrincipal principal) {

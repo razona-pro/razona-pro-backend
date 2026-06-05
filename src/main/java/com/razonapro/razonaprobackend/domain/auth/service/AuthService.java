@@ -4,6 +4,7 @@ import com.razonapro.razonaprobackend.domain.admin.model.Admin;
 import com.razonapro.razonaprobackend.domain.admin.repository.AdminRepository;
 import com.razonapro.razonaprobackend.domain.auth.dto.request.*;
 import com.razonapro.razonaprobackend.domain.auth.dto.response.AuthResponse;
+import com.razonapro.razonaprobackend.domain.auth.dto.response.ResendVerificationResponse;
 import com.razonapro.razonaprobackend.domain.auth.model.AdminToken;
 import com.razonapro.razonaprobackend.domain.auth.model.StudentToken;
 import com.razonapro.razonaprobackend.domain.auth.model.enums.AdminTokenType;
@@ -47,6 +48,10 @@ public class AuthService {
     private final PasswordEncoder        passwordEncoder;
     private final EmailService           emailService;
 
+    // Reenvío de verificación: 60s entre reenvíos, máx. 5 por hora
+    private static final int RESEND_COOLDOWN_SECONDS = 60;
+    private static final int RESEND_MAX_PER_HOUR     = 5;
+
     @Value("${jwt.email-verification-expiration-ms}")
     private long emailVerifyExpirationMs;
 
@@ -61,7 +66,7 @@ public class AuthService {
     public AuthResponse login(UnifiedLoginRequest req) {
         // Normalizar ANTES de validar patrón
         String code  = req.getCode().trim().toUpperCase();
-        String email = req.getEmail().trim().toUpperCase();
+        String email = req.getEmail().trim().toLowerCase();
 
         log.debug("Login intent — code={} email={}", code, email);
 
@@ -134,7 +139,7 @@ public class AuthService {
     public StudentDto registerStudent(StudentRegisterRequest req) {
         String studentId = req.getStudentId().trim().toUpperCase();
         String programId = studentId.substring(0, 3);
-        String email     = req.getEmail().trim().toUpperCase();
+        String email     = req.getEmail().trim().toLowerCase();
         String phone     = req.getPhone().trim();
 
         if (!programRepository.existsById(programId))
@@ -201,6 +206,52 @@ public class AuthService {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
+    //  REENVÍO DE VERIFICACIÓN (con rate limit en backend)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    @Transactional
+    public ResendVerificationResponse resendVerification(String rawEmail) {
+        String email = rawEmail.trim().toLowerCase();
+
+        Student student = studentRepository.findByEmail(email)
+                .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND,
+                        "No existe una cuenta con ese correo."));
+
+        if (Boolean.TRUE.equals(student.getEmailVerified()))
+            throw new ApiException(ErrorCode.EMAIL_ALREADY_VERIFIED,
+                    "Tu correo ya está verificado. Inicia sesión.");
+
+        String studentId = student.getStudentId();
+
+        // Tope por ventana: máximo N reenvíos por hora
+        long lastHour = studentTokenRepository.countByStudentIdAndTokenTypeAndCreatedAtAfter(
+                studentId, StudentTokenType.EMAIL_VERIFY, LocalDateTime.now().minusHours(1));
+        if (lastHour >= RESEND_MAX_PER_HOUR)
+            throw new ApiException(ErrorCode.RESEND_TOO_SOON,
+                    "Alcanzaste el límite de reenvíos por hora. Intenta más tarde.");
+
+        // Cooldown: tiempo mínimo entre reenvíos
+        var last = studentTokenRepository
+                .findTopByStudentIdAndTokenTypeOrderByCreatedAtDesc(studentId, StudentTokenType.EMAIL_VERIFY);
+        if (last.isPresent()) {
+            long elapsed = java.time.Duration.between(last.get().getCreatedAt(), LocalDateTime.now()).getSeconds();
+            if (elapsed < RESEND_COOLDOWN_SECONDS) {
+                long wait = RESEND_COOLDOWN_SECONDS - elapsed;
+                throw new ApiException(ErrorCode.RESEND_TOO_SOON,
+                        "Espera " + wait + " segundos antes de reenviar el correo.");
+            }
+        }
+
+        // Invalidar tokens previos de verificación y emitir uno nuevo
+        studentTokenRepository.invalidateAllByStudentAndType(studentId, StudentTokenType.EMAIL_VERIFY);
+        String raw = generateAndSaveStudentToken(studentId, StudentTokenType.EMAIL_VERIFY, emailVerifyExpirationMs);
+        emailService.sendVerificationEmail(email, student.getFirstName(), raw);
+        log.info("resendVerification — correo de verificación reenviado a {}", email);
+
+        return new ResendVerificationResponse(RESEND_COOLDOWN_SECONDS);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
     //  FORGOT PASSWORD UNIFICADO
     // ═══════════════════════════════════════════════════════════════════════
 
@@ -208,7 +259,7 @@ public class AuthService {
     public void forgotPassword(UnifiedForgotPasswordRequest req) {
         // Normalizar inputs
         String code  = req.getCode().trim().toUpperCase();
-        String email = req.getEmail().trim().toUpperCase();
+        String email = req.getEmail().trim().toLowerCase();
         String phone = req.getPhone().trim();
 
         log.debug("forgotPassword — code={} email={}", code, email);

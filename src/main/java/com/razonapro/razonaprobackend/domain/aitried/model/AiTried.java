@@ -25,10 +25,15 @@ public class AiTried {
     })
     private Student student;
 
-    /** IN_PROGRESS | FINISHED | ABANDONED */
+    /** IN_PROGRESS | FINISHED | ABANDONED | ANULADO (anulado por fraude) */
     @Column(name = "status", length = 15, nullable = false)
     @Builder.Default
     private String status = "IN_PROGRESS";
+
+    /** Nº de eventos sospechosos detectados (cambios de pestaña, etc.). */
+    @Column(name = "fraud_attempts", nullable = false)
+    @Builder.Default
+    private Integer fraudAttempts = 0;
 
     @Column(name = "score", precision = 5, scale = 2)
     private BigDecimal score;

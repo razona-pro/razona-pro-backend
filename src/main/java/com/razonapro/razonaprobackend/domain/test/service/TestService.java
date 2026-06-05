@@ -112,10 +112,16 @@ public class TestService {
         competenceRepository.findById(req.getCompetenceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Competencia", req.getCompetenceId()));
 
-        String normalizedName = req.getTestName().trim().toUpperCase();
+        String normalizedName = req.getTestName().trim();
         if (testRepository.existsByTestNameIgnoreCaseAndCompetenceId(normalizedName, req.getCompetenceId())) {
             throw new ApiException(ErrorCode.DUPLICATE_RESOURCE,
                     "Ya existe un test con el nombre \"" + req.getTestName() + "\" en esta competencia.");
+        }
+
+        // EXAM y TIMED requieren tiempo; PRACTICE puede ser sin tiempo (null)
+        if (!"PRACTICE".equals(req.getTestMode()) && req.getDurationSeconds() == null) {
+            throw new ApiException(ErrorCode.INVALID_INPUT,
+                    "Los modos EXAM y TIMED requieren una duración.");
         }
 
         Test test = Test.builder()
@@ -132,9 +138,12 @@ public class TestService {
 
         Test saved = testRepository.save(test);
 
-        notificationService.broadcastNewTest(saved.getTestName(),
-                competenceRepository.findById(req.getCompetenceId())
-                        .map(c -> c.getCompetenceName()).orElse(req.getCompetenceId()));
+        // El admin decide si notifica a todos los estudiantes al publicar el test
+        if (!Boolean.FALSE.equals(req.getNotifyStudents())) {
+            notificationService.broadcastNewTest(saved.getTestName(),
+                    competenceRepository.findById(req.getCompetenceId())
+                            .map(c -> c.getCompetenceName()).orElse(req.getCompetenceId()));
+        }
 
         return TestDto.from(saved);
     }
@@ -145,7 +154,7 @@ public class TestService {
                 .orElseThrow(() -> new ResourceNotFoundException("Test", testId));
 
         if (StringUtils.hasText(req.getTestName())) {
-            String normalizedName = req.getTestName().trim().toUpperCase();
+            String normalizedName = req.getTestName().trim();
             if (testRepository.existsByTestNameIgnoreCaseAndCompetenceIdAndTestIdNot(
                     normalizedName, competenceId, testId)) {
                 throw new ApiException(ErrorCode.DUPLICATE_RESOURCE,

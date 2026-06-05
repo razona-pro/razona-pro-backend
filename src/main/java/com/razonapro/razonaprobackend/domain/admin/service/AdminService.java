@@ -45,7 +45,7 @@ public class AdminService {
 
     @Transactional
     public AdminDto create(AdminCreateRequest req) {
-        if (adminRepository.existsByEmail(req.getEmail().trim().toUpperCase()))
+        if (adminRepository.existsByEmail(req.getEmail().trim().toLowerCase()))
             throw new ApiException(ErrorCode.EMAIL_ALREADY_EXISTS);
         if (adminRepository.existsByPhone(req.getPhone().trim()))
             throw new ApiException(ErrorCode.PHONE_ALREADY_EXISTS);

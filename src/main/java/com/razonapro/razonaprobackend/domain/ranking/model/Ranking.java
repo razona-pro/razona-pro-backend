@@ -49,7 +49,7 @@ public class Ranking implements Normalizable {
     @Override
     public void normalize() {
         rankingId   = StringNormalizer.upper(rankingId);
-        rankingName = StringNormalizer.upper(rankingName);
-        description = StringNormalizer.upper(description);
+        rankingName = StringNormalizer.trim(rankingName);
+        description = StringNormalizer.trim(description);
     }
 }

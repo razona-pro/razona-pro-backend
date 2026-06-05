@@ -16,7 +16,8 @@ public class TestRequest {
     @Size(max = 100)
     private String description;
 
-    @NotNull @Min(value = 60, message = "Duración mínima: 60 segundos")
+    /** NULL = sin tiempo (solo válido en PRACTICE). Para EXAM/TIMED es obligatorio (validado en el service). */
+    @Min(value = 60, message = "Duración mínima: 60 segundos")
     private Integer durationSeconds;
 
     @Min(1)
@@ -25,4 +26,7 @@ public class TestRequest {
     @NotBlank
     @Pattern(regexp = "^(PRACTICE|EXAM|TIMED)$", message = "Modo: PRACTICE, EXAM o TIMED")
     private String testMode;
+
+    /** Si el admin quiere notificar a todos los estudiantes al publicar el test. */
+    private Boolean notifyStudents = Boolean.TRUE;
 }

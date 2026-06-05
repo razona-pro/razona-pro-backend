@@ -81,11 +81,11 @@ public class Student implements Normalizable {
     public void normalize() {
         studentId     = StringNormalizer.upper(studentId);
         programId     = StringNormalizer.trim(programId);
-        firstName     = StringNormalizer.upper(firstName);
-        secondName    = StringNormalizer.upper(secondName);
-        firstSurname  = StringNormalizer.upper(firstSurname);
-        secondSurname = StringNormalizer.upper(secondSurname);
-        email         = StringNormalizer.upper(email);
+        firstName     = StringNormalizer.trim(firstName);
+        secondName    = StringNormalizer.trim(secondName);
+        firstSurname  = StringNormalizer.trim(firstSurname);
+        secondSurname = StringNormalizer.trim(secondSurname);
+        email         = StringNormalizer.lower(email);
         phone         = StringNormalizer.trim(phone);
     }
 }

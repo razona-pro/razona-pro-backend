@@ -43,9 +43,9 @@ public class Question implements Normalizable {
     @Column(name = "source", length = 50)
     private String source;
 
-    @Column(name = "difficulty_level", columnDefinition = "CHAR(1)", nullable = false)
-    @Builder.Default
-    private String difficultyLevel = "M";
+    /** B=Básico, M=Medio, A=Alto. NULL = "no aplica" (Saber Pro no maneja dificultad oficial). */
+    @Column(name = "difficulty_level", columnDefinition = "CHAR(1)")
+    private String difficultyLevel;
 
     @Column(name = "is_active", columnDefinition = "CHAR(1)", nullable = false)
     @Builder.Default
@@ -65,6 +65,6 @@ public class Question implements Normalizable {
     public void normalize() {
         statement   = StringNormalizer.trim(statement);
         explanation = StringNormalizer.trim(explanation);
-        source      = StringNormalizer.upper(source);
+        source      = StringNormalizer.trim(source);
     }
 }

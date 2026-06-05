@@ -24,6 +24,7 @@ public class TriedDto {
     private Integer       totalQuestions;
     private Integer       correctAnswers;
     private Integer       timeSpentSeconds;
+    private Integer       fraudAttempts;
     private LocalDateTime attemptTimestamp;
     private LocalDateTime finishedAt;
     private List<String>  questionIds;
@@ -39,6 +40,7 @@ public class TriedDto {
                 .totalQuestions(t.getTotalQuestions())
                 .correctAnswers(t.getCorrectAnswers())
                 .timeSpentSeconds(t.getTimeSpentSeconds())
+                .fraudAttempts(t.getFraudAttempts())
                 .attemptTimestamp(t.getAttemptTimestamp())
                 .finishedAt(t.getFinishedAt())
                 .build();

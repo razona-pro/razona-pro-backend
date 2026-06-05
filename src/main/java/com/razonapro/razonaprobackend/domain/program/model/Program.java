@@ -41,7 +41,7 @@ public class Program implements Normalizable {
     @Override
     public void normalize() {
         programId   = StringNormalizer.trim(programId);
-        programName = StringNormalizer.upper(programName);
-        description = StringNormalizer.upper(description);
+        programName = StringNormalizer.trim(programName);
+        description = StringNormalizer.trim(description);
     }
 }
