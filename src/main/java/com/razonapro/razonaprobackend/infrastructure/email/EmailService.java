@@ -123,7 +123,7 @@ public class EmailService {
             btn(link, "Confirmar cuenta") +
             infoBox("Este enlace es válido durante <strong>24 horas</strong>. Si no realizaste " +
                     "este registro, puedes ignorar este mensaje con total seguridad.");
-        send(toEmail, "Confirma tu cuenta — RazonaPro", base(content));
+        send(toEmail, "Confirma tu cuenta - RazonaPro", base(content));
     }
 
     // ── Bienvenida ────────────────────────────────────────────────────────
@@ -155,7 +155,7 @@ public class EmailService {
             infoBox("Este enlace es válido durante <strong>15 minutos</strong> y solo puede " +
                     "usarse una vez. Si no solicitaste este cambio, tu contraseña actual " +
                     "permanece segura y puedes ignorar este mensaje.");
-        send(toEmail, "Restablecimiento de contraseña — RazonaPro", base(content));
+        send(toEmail, "Restablecimiento de contraseña - RazonaPro", base(content));
     }
 
     // ── Nuevo test disponible ─────────────────────────────────────────────
@@ -172,7 +172,7 @@ public class EmailService {
             p("Practica cuando lo consideres oportuno. Cada simulacro contribuye a mejorar " +
               "tu posición en el ranking y fortalecer tu preparación.") +
             btn(link, "Ver simulacros");
-        send(toEmail, "Nuevo simulacro disponible — RazonaPro", base(content));
+        send(toEmail, "Nuevo simulacro disponible - RazonaPro", base(content));
     }
 
     // ── Utilidades ────────────────────────────────────────────────────────

@@ -118,7 +118,7 @@ public class AiTriedService {
         return new AiStatusDto(enabled, provider, model, reachable, message);
     }
 
-    // ── Iniciar — genera SÓLO la primera pregunta (adaptativo) ──────────
+    // ── Iniciar - genera SÓLO la primera pregunta (adaptativo) ──────────
 
     @Transactional
     public AiStartResponseDto start(StartAiTriedRequest req, UserPrincipal p) {
@@ -339,10 +339,10 @@ public class AiTriedService {
         return aiQuestionRepository.save(q);
     }
 
-    /** Normaliza el texto de la IA: reemplaza guiones largos (— – ―) por uno normal (-). */
+    /** Normaliza el texto de la IA: reemplaza guiones largos (- – ―) por uno normal (-). */
     private static String clean(String s) {
         if (s == null) return null;
-        return s.replace('—', '-')   // — em dash
+        return s.replace('-', '-')   // - em dash
                 .replace('–', '-')    // – en dash
                 .replace('―', '-');   // ― horizontal bar
     }

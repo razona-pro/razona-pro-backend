@@ -26,7 +26,7 @@ public class AiModelProperties {
     private double ollamaTemperature = 0.7;
     private int    ollamaMaxRetries  = 3;
 
-    // Cloud (Groq/OpenAI/OpenRouter — protocolo OpenAI)
+    // Cloud (Groq/OpenAI/OpenRouter - protocolo OpenAI)
     private String cloudBaseUrl     = "https://api.groq.com/openai/v1";
     private String cloudApiKey;
     private String cloudModel       = "llama-3.3-70b-versatile";

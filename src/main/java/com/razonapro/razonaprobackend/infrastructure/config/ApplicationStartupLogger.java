@@ -27,7 +27,7 @@ public class ApplicationStartupLogger {
 
         log.info("");
         log.info("════════════════════════════════════════════════════════════");
-        log.info("  RAZONAPRO BACKEND — listo");
+        log.info("  RAZONAPRO BACKEND - listo");
         log.info("  Profile  : {}", profile);
         log.info("  Frontend : {}", frontend);
         log.info("  Schema   : {}", schema);

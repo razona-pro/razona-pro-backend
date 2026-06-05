@@ -39,7 +39,7 @@ public class AiBatchGenerator implements AiQuestionGenerator {
 
         for (int attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                log.info("Generando batch — competencia={} n={} intento={}/{}",
+                log.info("Generando batch - competencia={} n={} intento={}/{}",
                         competenceName, totalQuestions, attempt, maxRetries);
                 String raw = client.chat(
                         PromptFactory.BATCH_SYSTEM,

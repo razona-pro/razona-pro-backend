@@ -47,6 +47,6 @@ public class DataInitializer implements CommandLineRunner {
                 .passwordHash(passwordEncoder.encode(cfg.getPassword()))
                 .build();
         adminRepository.save(admin);
-        log.info("Super admin creado — adminId: {}", admin.getAdminId());
+        log.info("Super admin creado - adminId: {}", admin.getAdminId());
     }
 }

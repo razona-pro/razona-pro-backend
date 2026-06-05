@@ -15,7 +15,7 @@ public interface OptionRepository extends JpaRepository<Option, OptionId> {
     List<Option> findByCompetenceIdAndQuestionId(String competenceId, String questionId);
     long countByCompetenceIdAndQuestionId(String competenceId, String questionId);
 
-    /** DELETE directo por JPQL — evita SELECT+delete individual, seguro con triggers de auditoría. */
+    /** DELETE directo por JPQL - evita SELECT+delete individual, seguro con triggers de auditoría. */
     @Modifying
     @Query("DELETE FROM Option o WHERE o.competenceId = :comp AND o.questionId = :qid")
     void deleteAllByQuestion(@Param("comp") String competenceId, @Param("qid") String questionId);

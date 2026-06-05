@@ -20,7 +20,6 @@ import com.razonapro.razonaprobackend.infrastructure.security.JwtService;
 import com.razonapro.razonaprobackend.infrastructure.util.TokenHashUtil;
 import com.razonapro.razonaprobackend.shared.exception.ApiException;
 import com.razonapro.razonaprobackend.shared.exception.ErrorCode;
-import com.razonapro.razonaprobackend.shared.util.StringNormalizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -68,7 +67,7 @@ public class AuthService {
         String code  = req.getCode().trim().toUpperCase();
         String email = req.getEmail().trim().toLowerCase();
 
-        log.debug("Login intent — code={} email={}", code, email);
+        log.debug("Login intent - code={} email={}", code, email);
 
         if (code.matches(ADMIN_CODE_PATTERN))
             return AuthResponse.builder().token(handleAdminLogin(email, req.getPassword(), code)).build();
@@ -79,35 +78,35 @@ public class AuthService {
     }
 
     private String handleAdminLogin(String email, String password, String code) {
-        log.debug("handleAdminLogin — buscando email={} code={}", email, code);
+        log.debug("handleAdminLogin - buscando email={} code={}", email, code);
 
         Admin admin = adminRepository.findByEmail(email)
                 .orElseThrow(() -> {
-                    log.warn("handleAdminLogin — email no encontrado: {}", email);
+                    log.warn("handleAdminLogin - email no encontrado: {}", email);
                     return new ApiException(ErrorCode.INVALID_CREDENTIALS);
                 });
 
-        log.debug("handleAdminLogin — admin encontrado: id={} active={} passwordHashLen={}",
+        log.debug("handleAdminLogin - admin encontrado: id={} active={} passwordHashLen={}",
                 admin.getAdminId(), admin.getIsActive(), admin.getPasswordHash().length());
 
         if (!admin.getAdminId().equalsIgnoreCase(code)) {
-            log.warn("handleAdminLogin — código no coincide: BD={} recibido={}",
+            log.warn("handleAdminLogin - código no coincide: BD={} recibido={}",
                     admin.getAdminId(), code);
             throw new ApiException(ErrorCode.INVALID_CREDENTIALS);
         }
         if (!Boolean.TRUE.equals(admin.getIsActive())) {
-            log.warn("handleAdminLogin — cuenta inactiva: {}", admin.getAdminId());
+            log.warn("handleAdminLogin - cuenta inactiva: {}", admin.getAdminId());
             throw new ApiException(ErrorCode.ACCOUNT_DISABLED);
         }
         if (!passwordEncoder.matches(password, admin.getPasswordHash())) {
-            log.warn("handleAdminLogin — contraseña incorrecta para adminId={} hashLen={}",
+            log.warn("handleAdminLogin - contraseña incorrecta para adminId={} hashLen={}",
                     admin.getAdminId(), admin.getPasswordHash().length());
             throw new ApiException(ErrorCode.INVALID_CREDENTIALS);
         }
 
         admin.setLastLoginAt(LocalDateTime.now());
         adminRepository.save(admin);
-        log.info("handleAdminLogin — login exitoso adminId={}", admin.getAdminId());
+        log.info("handleAdminLogin - login exitoso adminId={}", admin.getAdminId());
         return jwtService.generateAdminToken(admin.getAdminId(), admin.getEmail());
     }
 
@@ -178,7 +177,7 @@ public class AuthService {
     @Transactional
     public void verifyEmail(String rawToken) {
         String hash = TokenHashUtil.hash(rawToken.trim());
-        log.debug("verifyEmail — hash={}", hash);
+        log.debug("verifyEmail - hash={}", hash);
 
         StudentToken token = studentTokenRepository.findByTokenHash(hash)
                 .orElseThrow(() -> new ApiException(ErrorCode.TOKEN_INVALID));
@@ -246,7 +245,7 @@ public class AuthService {
         studentTokenRepository.invalidateAllByStudentAndType(studentId, StudentTokenType.EMAIL_VERIFY);
         String raw = generateAndSaveStudentToken(studentId, StudentTokenType.EMAIL_VERIFY, emailVerifyExpirationMs);
         emailService.sendVerificationEmail(email, student.getFirstName(), raw);
-        log.info("resendVerification — correo de verificación reenviado a {}", email);
+        log.info("resendVerification - correo de verificación reenviado a {}", email);
 
         return new ResendVerificationResponse(RESEND_COOLDOWN_SECONDS);
     }
@@ -262,7 +261,7 @@ public class AuthService {
         String email = req.getEmail().trim().toLowerCase();
         String phone = req.getPhone().trim();
 
-        log.debug("forgotPassword — code={} email={}", code, email);
+        log.debug("forgotPassword - code={} email={}", code, email);
 
         if (code.matches(ADMIN_CODE_PATTERN)) {
             handleAdminForgotPassword(code, email, phone);
@@ -272,22 +271,22 @@ public class AuthService {
             handleStudentForgotPassword(code, email, phone);
             return;
         }
-        // Respuesta genérica — no revelar motivo
-        log.debug("forgotPassword — código con formato no reconocido: {}", code);
+        // Respuesta genérica - no revelar motivo
+        log.debug("forgotPassword - código con formato no reconocido: {}", code);
     }
 
     private void handleAdminForgotPassword(String adminId, String email, String phone) {
         adminRepository.findById(adminId).ifPresent(admin -> {
             if (!admin.getEmail().equalsIgnoreCase(email)) {
-                log.debug("forgotPassword admin — email no coincide");
+                log.debug("forgotPassword admin - email no coincide");
                 return;
             }
             if (!admin.getPhone().equals(phone)) {
-                log.debug("forgotPassword admin — teléfono no coincide");
+                log.debug("forgotPassword admin - teléfono no coincide");
                 return;
             }
             if (!Boolean.TRUE.equals(admin.getIsActive())) {
-                log.debug("forgotPassword admin — cuenta inactiva");
+                log.debug("forgotPassword admin - cuenta inactiva");
                 return;
             }
 
@@ -297,22 +296,22 @@ public class AuthService {
             String raw = generateAndSaveAdminToken(
                     adminId, AdminTokenType.PASSWORD_RESET, passwordResetExpirationMs);
             emailService.sendPasswordResetEmail(admin.getEmail(), admin.getFirstName(), raw);
-            log.info("forgotPassword admin — enlace enviado a {}", admin.getEmail());
+            log.info("forgotPassword admin - enlace enviado a {}", admin.getEmail());
         });
     }
 
     private void handleStudentForgotPassword(String studentId, String email, String phone) {
         studentRepository.findByStudentId(studentId).ifPresent(student -> {
             if (!student.getEmail().equalsIgnoreCase(email)) {
-                log.debug("forgotPassword student — email no coincide");
+                log.debug("forgotPassword student - email no coincide");
                 return;
             }
             if (!student.getPhone().equals(phone)) {
-                log.debug("forgotPassword student — teléfono no coincide");
+                log.debug("forgotPassword student - teléfono no coincide");
                 return;
             }
             if (!Boolean.TRUE.equals(student.getIsActive())) {
-                log.debug("forgotPassword student — cuenta inactiva");
+                log.debug("forgotPassword student - cuenta inactiva");
                 return;
             }
 
@@ -322,7 +321,7 @@ public class AuthService {
             String raw = generateAndSaveStudentToken(
                     studentId, StudentTokenType.PASSWORD_RESET, passwordResetExpirationMs);
             emailService.sendPasswordResetEmail(student.getEmail(), student.getFirstName(), raw);
-            log.info("forgotPassword student — enlace enviado a {}", student.getEmail());
+            log.info("forgotPassword student - enlace enviado a {}", student.getEmail());
         });
     }
 
@@ -336,7 +335,7 @@ public class AuthService {
         String rawToken = req.getToken().trim();
         String hash     = TokenHashUtil.hash(rawToken);
 
-        log.debug("resetPassword — token_len={} hash={}", rawToken.length(), hash);
+        log.debug("resetPassword - token_len={} hash={}", rawToken.length(), hash);
 
         // Intentar como token de estudiante primero
         var studentTokenOpt = studentTokenRepository.findByTokenHash(hash);
@@ -352,12 +351,12 @@ public class AuthService {
             return;
         }
 
-        log.warn("resetPassword — token no encontrado en ninguna tabla. hash={}", hash);
+        log.warn("resetPassword - token no encontrado en ninguna tabla. hash={}", hash);
         throw new ApiException(ErrorCode.TOKEN_INVALID);
     }
 
     private void applyStudentReset(StudentToken token, String newPassword) {
-        log.debug("applyStudentReset — studentId={} type={} expired={} used={}",
+        log.debug("applyStudentReset - studentId={} type={} expired={} used={}",
                 token.getStudentId(), token.getTokenType(), token.isExpired(), token.isUsed());
 
         if (token.getTokenType() != StudentTokenType.PASSWORD_RESET)
@@ -377,11 +376,11 @@ public class AuthService {
         token.setUsedAt(LocalDateTime.now());
         studentTokenRepository.save(token);
 
-        log.info("applyStudentReset — contraseña actualizada para studentId={}", student.getStudentId());
+        log.info("applyStudentReset - contraseña actualizada para studentId={}", student.getStudentId());
     }
 
     private void applyAdminReset(AdminToken token, String newPassword) {
-        log.debug("applyAdminReset — adminId={} type={} expired={} used={}",
+        log.debug("applyAdminReset - adminId={} type={} expired={} used={}",
                 token.getAdminId(), token.getTokenType(), token.isExpired(), token.isUsed());
 
         if (token.getTokenType() != AdminTokenType.PASSWORD_RESET)
@@ -401,7 +400,7 @@ public class AuthService {
         token.setUsedAt(LocalDateTime.now());
         adminTokenRepository.save(token);
 
-        log.info("applyAdminReset — contraseña actualizada para adminId={}", admin.getAdminId());
+        log.info("applyAdminReset - contraseña actualizada para adminId={}", admin.getAdminId());
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -411,7 +410,7 @@ public class AuthService {
     private String generateAndSaveStudentToken(String studentId, StudentTokenType type, long ms) {
         String raw  = TokenHashUtil.generate();
         String hash = TokenHashUtil.hash(raw);
-        log.debug("generateStudentToken — studentId={} type={} hash={}", studentId, type, hash);
+        log.debug("generateStudentToken - studentId={} type={} hash={}", studentId, type, hash);
 
         studentTokenRepository.save(StudentToken.builder()
                 .studentId(studentId)
@@ -425,7 +424,7 @@ public class AuthService {
     private String generateAndSaveAdminToken(String adminId, AdminTokenType type, long ms) {
         String raw  = TokenHashUtil.generate();
         String hash = TokenHashUtil.hash(raw);
-        log.debug("generateAdminToken — adminId={} type={} hash={}", adminId, type, hash);
+        log.debug("generateAdminToken - adminId={} type={} hash={}", adminId, type, hash);
 
         adminTokenRepository.save(AdminToken.builder()
                 .adminId(adminId)

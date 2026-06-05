@@ -86,6 +86,6 @@ public class NotificationService {
             if (Boolean.TRUE.equals(s.getEmailVerified()))
                 emailService.sendNewTestEmail(s.getEmail(), s.getFirstName(), testName, competenceName);
         }
-        log.info("broadcastNewTest — {} estudiantes notificados sobre '{}'", students.size(), testName);
+        log.info("broadcastNewTest - {} estudiantes notificados sobre '{}'", students.size(), testName);
     }
 }

@@ -26,14 +26,14 @@ public class RestAuthExceptionHandler implements AuthenticationEntryPoint, Acces
 
     private final ObjectMapper objectMapper;
 
-    /** 401 — petición sin autenticación válida. */
+    /** 401 - petición sin autenticación válida. */
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response,
                          AuthenticationException authException) throws IOException {
         write(response, ErrorCode.UNAUTHENTICATED);
     }
 
-    /** 403 — autenticado pero sin permisos. */
+    /** 403 - autenticado pero sin permisos. */
     @Override
     public void handle(HttpServletRequest request, HttpServletResponse response,
                        AccessDeniedException accessDeniedException) throws IOException {

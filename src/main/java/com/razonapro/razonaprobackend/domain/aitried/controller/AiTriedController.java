@@ -86,7 +86,7 @@ public class AiTriedController {
 
     @PostMapping("/start")
     @PreAuthorize("hasRole('STUDENT')")
-    @Operation(summary = "Inicia sesión adaptativa — genera SÓLO la primera pregunta")
+    @Operation(summary = "Inicia sesión adaptativa - genera SÓLO la primera pregunta")
     public ResponseEntity<ApiResponse<AiStartResponseDto>> start(
             @Valid @RequestBody StartAiTriedRequest req, @AuthenticationPrincipal UserPrincipal p) {
         return ResponseEntity.status(HttpStatus.CREATED)

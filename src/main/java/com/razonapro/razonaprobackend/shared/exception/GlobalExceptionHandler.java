@@ -118,7 +118,7 @@ public class GlobalExceptionHandler {
         return build(ErrorCode.DATA_INTEGRITY_VIOLATION, ErrorCode.DATA_INTEGRITY_VIOLATION.getDefaultMessage());
     }
 
-    // ── Fallback (500) — nunca expone detalles internos ───────────────────
+    // ── Fallback (500) - nunca expone detalles internos ───────────────────
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGeneral(Exception ex) {

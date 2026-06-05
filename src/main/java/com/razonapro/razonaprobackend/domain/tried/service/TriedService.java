@@ -203,12 +203,12 @@ public class TriedService {
                 .build();
         triedRepository.save(tried);
 
-        // NO pre-crear StudentResponse — se crean al responder
+        // NO pre-crear StudentResponse - se crean al responder
         return TriedDto.fromWithQuestions(tried, selected);
     }
     /**
      * Garantiza que exista la opción centinela OTN000 para la pregunta.
-     * Es la opción "Sin responder" — is_correct = false, nunca se muestra al estudiante.
+     * Es la opción "Sin responder" - is_correct = false, nunca se muestra al estudiante.
      */
     private void ensureUnansweredOption(String competenceId, String questionId) {
         OptionId centinelaId = new OptionId(competenceId, questionId, IdGenerator.UNANSWERED_OPTION_ID);

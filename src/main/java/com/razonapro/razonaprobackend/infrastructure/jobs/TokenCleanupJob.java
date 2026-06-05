@@ -23,6 +23,6 @@ public class TokenCleanupJob {
                 "DELETE FROM " + schema + ".admin_tokens   WHERE expires_at < NOW() - INTERVAL '7 days'");
         int students = jdbc.update(
                 "DELETE FROM " + schema + ".student_tokens WHERE expires_at < NOW() - INTERVAL '7 days'");
-        log.info("TokenCleanupJob — admin_tokens borrados: {}, student_tokens borrados: {}", admins, students);
+        log.info("TokenCleanupJob - admin_tokens borrados: {}, student_tokens borrados: {}", admins, students);
     }
 }

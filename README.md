@@ -1,6 +1,6 @@
 # RazonaPro Backend
 
-API REST de la plataforma de preparación Saber Pro — UFPSO.
+API REST de la plataforma de preparación Saber Pro - UFPSO.
 
 **Stack** · Spring Boot 4.0.6 · Java 21 · PostgreSQL 18 · JWT (jjwt 0.12) · Lombok · springdoc-openapi 2.8 · Bucket4j · Spring Cache
 
@@ -56,15 +56,15 @@ com.razonapro.razonaprobackend/
 |----------|--------------------|-------------------------------------|
 | `CLOUD`  | `CloudChatClient`  | Groq / OpenAI / OpenRouter (OpenAI) |
 | `OLLAMA` | `OllamaChatClient` | Modelo local                        |
-| `NONE`   | —                  | IA deshabilitada                    |
+| `NONE`   | -                  | IA deshabilitada                    |
 
 **Flujo de práctica (batch):**
-1. `POST /api/ai-trieds/start` — genera **todas** las preguntas en una sola llamada, las persiste en `ai_questions` y devuelve la primera.
-2. `GET /api/ai-trieds/{id}/questions` — lista todas (sin revelar la correcta).
-3. `POST /api/ai-trieds/{id}/answer` — evalúa en servidor; escribe en `ai_tried_responses` (dispara triggers de `correct_answers`/score).
-4. `POST /api/ai-trieds/{id}/hint` — pista nivel 1-3, progresiva, tope 3 (`hints_used` persistido).
-5. `GET /api/ai-trieds/{id}/review` — historial con respuestas y explicaciones.
-6. `PUT /api/ai-trieds/{id}/finish` — cierra y calcula puntaje.
+1. `POST /api/ai-trieds/start` - genera **todas** las preguntas en una sola llamada, las persiste en `ai_questions` y devuelve la primera.
+2. `GET /api/ai-trieds/{id}/questions` - lista todas (sin revelar la correcta).
+3. `POST /api/ai-trieds/{id}/answer` - evalúa en servidor; escribe en `ai_tried_responses` (dispara triggers de `correct_answers`/score).
+4. `POST /api/ai-trieds/{id}/hint` - pista nivel 1-3, progresiva, tope 3 (`hints_used` persistido).
+5. `GET /api/ai-trieds/{id}/review` - historial con respuestas y explicaciones.
+6. `PUT /api/ai-trieds/{id}/finish` - cierra y calcula puntaje.
 
 La corrección **nunca** la decide el cliente: solo envía `selectedIndex`.
 

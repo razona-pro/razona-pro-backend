@@ -6,7 +6,7 @@ import org.springframework.http.HttpStatus;
  * Catálogo de errores de negocio de la aplicación.
  * <p>
  * El "código" que viaja al cliente es el NOMBRE del enum ({@link #name()}),
- * que es estable, semántico y único por construcción — no se mantienen
+ * que es estable, semántico y único por construcción - no se mantienen
  * identificadores arbitrarios. Cada error declara su estado HTTP y un mensaje
  * por defecto en español.
  */

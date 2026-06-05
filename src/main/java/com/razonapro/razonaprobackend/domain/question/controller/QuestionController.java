@@ -24,7 +24,7 @@ public class QuestionController {
 
     private final QuestionService questionService;
 
-    /** Global — todas las preguntas con filtros opcionales (admin) */
+    /** Global - todas las preguntas con filtros opcionales (admin) */
     @GetMapping("/api/questions")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<PagedResponse<QuestionDto>>> findAll(
