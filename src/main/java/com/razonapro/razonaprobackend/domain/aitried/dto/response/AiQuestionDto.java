@@ -12,7 +12,9 @@ public record AiQuestionDto(
         int totalQuestions,
         int hintsUsed,
         Integer selectedIndex,   // null si no respondida
-        Boolean isCorrect        // null si no respondida
+        Boolean isCorrect,       // null si no respondida
+        Integer correctIndex,    // null si no revelada (solo admin/review)
+        String explanation       // null si no revelada (solo admin/review)
 ) {
     public record OptionDto(String id, String text) {}
 }

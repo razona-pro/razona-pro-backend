@@ -434,11 +434,14 @@ public class AiTriedService {
         List<AiQuestionDto.OptionDto> dtoOpts = new ArrayList<>();
         for (int i = 0; i < opts.size(); i++)
             dtoOpts.add(new AiQuestionDto.OptionDto("OPT" + i, opts.get(i).text()));
+        boolean answered = q.getSelectedIndex() != null;
         return new AiQuestionDto(
                 q.getAiQuestionId(), q.getStatement(), dtoOpts, q.getDifficultyLevel(),
                 q.getQuestionOrder(), total, q.getHintsUsed(),
                 q.getSelectedIndex(),
-                reveal ? q.getIsCorrect() : (q.getSelectedIndex() != null ? q.getIsCorrect() : null));
+                reveal ? q.getIsCorrect() : (answered ? q.getIsCorrect() : null),
+                (reveal || answered) ? q.getCorrectIndex() : null,
+                (reveal || answered) ? q.getExplanation()  : null);
     }
 
     private String writeOptions(List<AiOption> opts) {

@@ -40,8 +40,10 @@ import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -90,7 +92,8 @@ public class TriedService {
                 .orElseThrow(() -> new ResourceNotFoundException("Intento", triedId));
         assertOwnership(tried, principal);
 
-        if (!"FINISHED".equals(tried.getStatus())) {
+        Set<String> reviewable = Set.of("FINISHED", "ABANDONED", "ANULADO", "TIMED_OUT");
+        if (!reviewable.contains(tried.getStatus())) {
             throw new ApiException(ErrorCode.TRIED_NOT_FINISHED);
         }
 
@@ -320,11 +323,20 @@ public class TriedService {
         String  testMode = (test != null) ? test.getTestMode()        : null;
 
         if (!"IN_PROGRESS".equals(tried.getStatus()))
-            return TriedResumeDto.of(tried, 0, duration, false, true, testMode);
+            return TriedResumeDto.of(tried, 0, duration, false, true, testMode, null);
+
+        // Cargar respuestas previamente guardadas para que el frontend las restaure
+        Map<String, String> savedAnswers = responseRepository.findByTriedId(triedId).stream()
+                .filter(r -> r.getOptionId() != null)
+                .collect(Collectors.toMap(
+                        StudentResponse::getQuestionId,
+                        StudentResponse::getOptionId,
+                        (a, b) -> b,
+                        LinkedHashMap::new));
 
         // Práctica sin tiempo: nunca expira
         if (duration == null)
-            return TriedResumeDto.of(tried, null, null, false, false, testMode);
+            return TriedResumeDto.of(tried, null, null, false, false, testMode, savedAnswers);
 
         long elapsed   = java.time.Duration.between(tried.getAttemptTimestamp(), LocalDateTime.now()).getSeconds();
         long remaining = duration - elapsed;
@@ -333,11 +345,13 @@ public class TriedService {
             tried.setStatus("ABANDONED");
             tried.setFinishedAt(LocalDateTime.now());
             tried.setTimeSpentSeconds((int) Math.min(elapsed, duration));
+            createUnansweredResponses(tried);
+            calculateScore(tried);
             triedRepository.save(tried);
-            return TriedResumeDto.of(tried, 0, duration, true, true, testMode);
+            return TriedResumeDto.of(tried, 0, duration, true, true, testMode, null);
         }
 
-        return TriedResumeDto.of(tried, (int) remaining, duration, false, false, testMode);
+        return TriedResumeDto.of(tried, (int) remaining, duration, false, false, testMode, savedAnswers);
     }
 
     // ── Fraude: registrar evento y anular si supera el límite ────────────
@@ -367,6 +381,8 @@ public class TriedService {
         if (count >= FRAUD_LIMIT) {
             tried.setStatus("ANULADO");
             tried.setFinishedAt(LocalDateTime.now());
+            createUnansweredResponses(tried);
+            calculateScore(tried);
             notifyAdminsFraud(tried, principal);
         }
         return TriedDto.from(triedRepository.save(tried));
@@ -389,25 +405,48 @@ public class TriedService {
 
     // ── Helpers privados ─────────────────────────────────────────────────
 
-    private void finishTried(Tried tried) {
-        tried.setStatus("FINISHED");
-        tried.setFinishedAt(LocalDateTime.now());
-
+    private void calculateScore(Tried tried) {
         List<StudentResponse> responses = responseRepository
                 .findByTriedIdAndOptionIdIsNotNull(tried.getTriedId());
-
         long correct = responses.stream().filter(r -> Boolean.TRUE.equals(r.getIsCorrect())).count();
         tried.setCorrectAnswers((int) correct);
-
-        // Test estático = % sobre 100 ("respondiste X de Y"). No pondera por dificultad
-        // (la Saber Pro no la maneja). El trigger fn_calculate_tried_score lo recalcula
-        // igual al persistir, pero lo dejamos coherente en la app.
         int total = tried.getTotalQuestions() != null ? tried.getTotalQuestions() : 0;
         tried.setScore(total > 0
                 ? BigDecimal.valueOf(correct)
                         .divide(BigDecimal.valueOf(total), 4, RoundingMode.HALF_UP)
                         .multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO);
+    }
+
+    private void createUnansweredResponses(Tried tried) {
+        List<TestQuestion> testQuestions = testQuestionRepository
+                .findByTestIdAndCompetenceIdAndIsActiveTrue(tried.getTestId(), tried.getCompetenceId());
+        long base = responseRepository.count();
+        int idx = 0;
+        for (TestQuestion tq : testQuestions) {
+            if (!responseRepository.existsByTriedIdAndQuestionId(tried.getTriedId(), tq.getQuestionId())) {
+                responseRepository.save(StudentResponse.builder()
+                        .studentResponseId(IdGenerator.studentResponseId(base + idx))
+                        .competenceId(tried.getCompetenceId())
+                        .testId(tried.getTestId())
+                        .programId(tried.getProgramId())
+                        .studentId(tried.getStudentId())
+                        .triedId(tried.getTriedId())
+                        .questionId(tq.getQuestionId())
+                        .optionId(null)
+                        .isCorrect(false)
+                        .answeredAt(null)
+                        .build());
+                idx++;
+            }
+        }
+    }
+
+    private void finishTried(Tried tried) {
+        tried.setStatus("FINISHED");
+        tried.setFinishedAt(LocalDateTime.now());
+        createUnansweredResponses(tried);
+        calculateScore(tried);
     }
 
     private void assertOwnership(Tried tried, UserPrincipal principal) {

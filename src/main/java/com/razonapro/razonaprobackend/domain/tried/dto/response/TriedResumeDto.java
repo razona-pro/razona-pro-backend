@@ -4,6 +4,8 @@ import com.razonapro.razonaprobackend.domain.tried.model.Tried;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.util.Map;
+
 /**
  * Estado de reanudación de un intento. El tiempo es autoritativo del servidor:
  * se calcula desde attempt_timestamp + duración del test, no desde el cliente.
@@ -23,9 +25,12 @@ public class TriedResumeDto {
     private boolean  closed;
     /** Modo real del test desde el servidor: PRACTICE, EXAM, TIMED. */
     private String   testMode;
+    /** Respuestas previamente guardadas (questionId → optionId). null si cerrado. */
+    private Map<String, String> savedAnswers;
 
     public static TriedResumeDto of(Tried t, Integer remaining, Integer duration,
-                                    boolean expired, boolean closed, String testMode) {
+                                    boolean expired, boolean closed, String testMode,
+                                    Map<String, String> savedAnswers) {
         return TriedResumeDto.builder()
                 .tried(TriedDto.from(t))
                 .remainingSeconds(remaining)
@@ -33,6 +38,7 @@ public class TriedResumeDto {
                 .expired(expired)
                 .closed(closed)
                 .testMode(testMode)
+                .savedAnswers(savedAnswers)
                 .build();
     }
 }
