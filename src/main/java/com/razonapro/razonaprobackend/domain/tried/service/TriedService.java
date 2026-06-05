@@ -94,11 +94,20 @@ public class TriedService {
             throw new ApiException(ErrorCode.TRIED_NOT_FINISHED);
         }
 
-        // Cargar respuestas del estudiante indexadas por questionId
+        // Cargar respuestas del estudiante indexadas por questionId.
+        // Si existen duplicados por race condition, se conserva la más reciente.
         List<StudentResponse> responses = responseRepository.findByTriedId(triedId);
         Map<String, StudentResponse> responseByQuestion = responses.stream()
                 .filter(r -> r.getOptionId() != null)
-                .collect(Collectors.toMap(StudentResponse::getQuestionId, r -> r));
+                .collect(Collectors.toMap(
+                        StudentResponse::getQuestionId,
+                        r -> r,
+                        (a, b) -> {
+                            if (b.getAnsweredAt() == null) return a;
+                            if (a.getAnsweredAt() == null) return b;
+                            return b.getAnsweredAt().isAfter(a.getAnsweredAt()) ? b : a;
+                        }
+                ));
 
         // Cargar las preguntas asignadas al test
         List<TestQuestion> testQuestions = testQuestionRepository
@@ -247,8 +256,8 @@ public class TriedService {
         if (!questionBelongs)
             throw new ApiException(ErrorCode.INVALID_INPUT, "Pregunta no pertenece a este test");
 
-        // Buscar respuesta existente o crear nueva
-        var existingOpt = responseRepository.findByTriedIdAndQuestionId(triedId, req.getQuestionId());
+        // Buscar respuesta existente con lock para evitar inserciones duplicadas concurrentes
+        var existingOpt = responseRepository.findByTriedIdAndQuestionIdForUpdate(triedId, req.getQuestionId());
         if (existingOpt.isPresent()) {
             StudentResponse sr = existingOpt.get();
             sr.setOptionId(req.getOptionId());
@@ -308,13 +317,14 @@ public class TriedService {
         Test test = testRepository.findById(new TestPK(tried.getTestId(), tried.getCompetenceId()))
                 .orElse(null);
         Integer duration = (test != null) ? test.getDurationSeconds() : null;
+        String  testMode = (test != null) ? test.getTestMode()        : null;
 
         if (!"IN_PROGRESS".equals(tried.getStatus()))
-            return TriedResumeDto.of(tried, 0, duration, false, true);
+            return TriedResumeDto.of(tried, 0, duration, false, true, testMode);
 
         // Práctica sin tiempo: nunca expira
         if (duration == null)
-            return TriedResumeDto.of(tried, null, null, false, false);
+            return TriedResumeDto.of(tried, null, null, false, false, testMode);
 
         long elapsed   = java.time.Duration.between(tried.getAttemptTimestamp(), LocalDateTime.now()).getSeconds();
         long remaining = duration - elapsed;
@@ -324,10 +334,10 @@ public class TriedService {
             tried.setFinishedAt(LocalDateTime.now());
             tried.setTimeSpentSeconds((int) Math.min(elapsed, duration));
             triedRepository.save(tried);
-            return TriedResumeDto.of(tried, 0, duration, true, true);
+            return TriedResumeDto.of(tried, 0, duration, true, true, testMode);
         }
 
-        return TriedResumeDto.of(tried, (int) remaining, duration, false, false);
+        return TriedResumeDto.of(tried, (int) remaining, duration, false, false, testMode);
     }
 
     // ── Fraude: registrar evento y anular si supera el límite ────────────

@@ -1,7 +1,11 @@
 package com.razonapro.razonaprobackend.domain.tried.repository;
 
 import com.razonapro.razonaprobackend.domain.tried.model.StudentResponse;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -13,6 +17,13 @@ public interface StudentResponseRepository extends JpaRepository<StudentResponse
     List<StudentResponse> findByTriedIdAndOptionIdIsNotNull(String triedId);
 
     Optional<StudentResponse> findByTriedIdAndQuestionId(String triedId, String questionId);
+
+    /** Lock pesimista para evitar inserciones duplicadas por concurrencia. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT sr FROM StudentResponse sr WHERE sr.triedId = :triedId AND sr.questionId = :questionId")
+    Optional<StudentResponse> findByTriedIdAndQuestionIdForUpdate(
+            @Param("triedId") String triedId,
+            @Param("questionId") String questionId);
 
     boolean existsByTriedIdAndQuestionId(String triedId, String questionId);
 

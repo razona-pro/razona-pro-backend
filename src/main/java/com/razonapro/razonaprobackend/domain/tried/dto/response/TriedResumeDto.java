@@ -21,15 +21,18 @@ public class TriedResumeDto {
     private boolean  expired;
     /** true si el intento ya no está IN_PROGRESS (finalizado/abandonado/anulado). */
     private boolean  closed;
+    /** Modo real del test desde el servidor: PRACTICE, EXAM, TIMED. */
+    private String   testMode;
 
     public static TriedResumeDto of(Tried t, Integer remaining, Integer duration,
-                                    boolean expired, boolean closed) {
+                                    boolean expired, boolean closed, String testMode) {
         return TriedResumeDto.builder()
                 .tried(TriedDto.from(t))
                 .remainingSeconds(remaining)
                 .durationSeconds(duration)
                 .expired(expired)
                 .closed(closed)
+                .testMode(testMode)
                 .build();
     }
 }
