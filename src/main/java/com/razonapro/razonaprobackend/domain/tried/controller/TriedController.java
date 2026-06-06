@@ -83,10 +83,9 @@ public class TriedController {
     @Operation(summary = "Indica si el estudiante puede entrar a una prueba (y si hay un intento activo para reanudar)")
     public ResponseEntity<ApiResponse<TriedEligibilityDto>> eligibility(
             @RequestParam String testId,
-            @RequestParam String competenceId,
             @AuthenticationPrincipal UserPrincipal principal) {
         return ResponseEntity.ok(ApiResponse.ok(
-                triedService.checkEligibility(testId, competenceId, principal)));
+                triedService.checkEligibility(testId, principal)));
     }
 
     @PostMapping("/start")

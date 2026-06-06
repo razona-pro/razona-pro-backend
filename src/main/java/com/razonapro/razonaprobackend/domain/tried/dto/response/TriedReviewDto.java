@@ -21,7 +21,6 @@ public class TriedReviewDto {
     private String        triedId;
     private String        testId;
     private String        testName;
-    private String        competenceId;
     private String        status;
     private BigDecimal    score;
     private Integer       totalQuestions;
@@ -37,6 +36,7 @@ public class TriedReviewDto {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class QuestionReview {
         private String       questionId;
+        private String       competenceId;
         private String       statement;
         private String       explanation;
         private String       source;

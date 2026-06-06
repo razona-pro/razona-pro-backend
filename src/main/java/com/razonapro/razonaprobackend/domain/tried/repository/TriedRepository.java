@@ -34,11 +34,14 @@ public interface TriedRepository extends JpaRepository<Tried, TriedId> {
 
     long countByStatus(String status);
 
-    /** Suma de score y conteo para ranking: solo EXAM/TIMED FINISHED, en el período [start,end] (null = sin límite). */
+    /**
+     * Ranking GENERAL (todas las competencias): suma el score de los intentos EXAM/TIMED
+     * FINISHED en el período [start,end] (null = sin límite).
+     */
     @Query("""
         SELECT COALESCE(SUM(t.score), 0), COUNT(t)
         FROM Tried t, com.razonapro.razonaprobackend.domain.test.model.Test te
-        WHERE te.testId = t.testId AND te.competenceId = t.competenceId
+        WHERE te.testId = t.testId
           AND t.studentId = :studentId AND t.programId = :programId
           AND t.status = 'FINISHED' AND t.score IS NOT NULL
           AND te.testMode IN ('EXAM','TIMED')
@@ -49,6 +52,36 @@ public interface TriedRepository extends JpaRepository<Tried, TriedId> {
                                                  @Param("programId") String programId,
                                                  @Param("start") java.time.LocalDateTime start,
                                                  @Param("end")   java.time.LocalDateTime end);
+
+    /**
+     * Ranking POR COMPETENCIA (multicompetencia): suma los puntos PONDERADOS de las
+     * respuestas correctas de esa competencia dentro de intentos EXAM/TIMED FINISHED.
+     * El peso por dificultad coincide con el motor de puntaje (N/A/B=1, M=2, A=3).
+     */
+    @Query("""
+        SELECT COALESCE(SUM(CASE WHEN q.difficultyLevel = 'A' THEN 3
+                                 WHEN q.difficultyLevel = 'M' THEN 2
+                                 ELSE 1 END), 0),
+               COUNT(DISTINCT sr.triedId)
+        FROM com.razonapro.razonaprobackend.domain.tried.model.StudentResponse sr,
+             Tried t,
+             com.razonapro.razonaprobackend.domain.test.model.Test te,
+             com.razonapro.razonaprobackend.domain.question.model.Question q
+        WHERE sr.triedId = t.triedId AND sr.studentId = t.studentId AND sr.programId = t.programId
+          AND sr.studentId = :studentId AND sr.programId = :programId
+          AND sr.isCorrect = true AND sr.optionId IS NOT NULL
+          AND sr.competenceId = :competenceId
+          AND q.competenceId = sr.competenceId AND q.questionId = sr.questionId
+          AND te.testId = t.testId AND te.testMode IN ('EXAM','TIMED')
+          AND t.status = 'FINISHED'
+          AND (:start IS NULL OR COALESCE(t.finishedAt, t.attemptTimestamp) >= :start)
+          AND (:end   IS NULL OR COALESCE(t.finishedAt, t.attemptTimestamp) <= :end)
+    """)
+    java.util.List<Object[]> sumTriedsByCompetenceForRanking(@Param("studentId") String studentId,
+                                                             @Param("programId") String programId,
+                                                             @Param("competenceId") String competenceId,
+                                                             @Param("start") java.time.LocalDateTime start,
+                                                             @Param("end")   java.time.LocalDateTime end);
 
     /**
      * % de intentos "satisfactorios" = con al menos 60% de aciertos (correctas/total).
@@ -78,14 +111,4 @@ public interface TriedRepository extends JpaRepository<Tried, TriedId> {
     """)
     List<Object[]> findStudentPerformanceSummary();
 
-    @Query("""
-        SELECT t.studentId,
-               t.competenceId,
-               COUNT(t) as totalTrieds,
-               COALESCE(AVG(t.score), 0) as avgScore
-        FROM Tried t
-        WHERE t.status = 'FINISHED' AND t.studentId = :studentId
-        GROUP BY t.studentId, t.competenceId
-    """)
-    List<Object[]> findStudentPerformanceByCompetence(@Param("studentId") String studentId);
 }

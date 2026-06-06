@@ -51,6 +51,19 @@ public class RankingController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(rankingService.create(req)));
     }
 
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<RankingDto>> update(
+            @PathVariable String id, @Valid @RequestBody RankingRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok(rankingService.update(id, req)));
+    }
+
+    @PutMapping("/{id}/activate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<RankingDto>> activate(@PathVariable String id) {
+        return ResponseEntity.ok(ApiResponse.ok(rankingService.activate(id)));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable String id) {

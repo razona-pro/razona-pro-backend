@@ -7,8 +7,8 @@ import lombok.Setter;
 @Getter @Setter
 public class TestRequest {
 
-    @NotBlank @Size(max = 6)
-    private String competenceId;
+    // Multicompetencia: la prueba ya NO se crea atada a una competencia.
+    // Sus competencias surgen de las preguntas que se le asignan.
 
     @NotBlank @Size(max = 50)
     private String testName;

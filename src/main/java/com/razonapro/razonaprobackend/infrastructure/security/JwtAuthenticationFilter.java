@@ -4,6 +4,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import com.razonapro.razonaprobackend.domain.student.repository.StudentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -23,6 +24,7 @@ import java.util.List;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
+    private final StudentRepository studentRepository;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -37,6 +39,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String role      = jwtService.getRole(token);
                 String userType  = jwtService.getUserType(token);
                 String programId = jwtService.getProgramId(token);
+
+                // Si el estudiante fue desactivado, su token deja de ser válido de inmediato:
+                // no se establece autenticación → las peticiones autenticadas devuelven 401/403.
+                if ("STUDENT".equals(userType) && !studentRepository.existsByStudentIdAndIsActiveTrue(userId)) {
+                    chain.doFilter(request, response);
+                    return;
+                }
 
                 UserPrincipal principal = UserPrincipal.builder()
                         .id(userId)

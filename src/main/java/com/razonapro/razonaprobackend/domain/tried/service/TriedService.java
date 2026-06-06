@@ -123,9 +123,9 @@ public class TriedService {
                         }
                 ));
 
-        // Cargar las preguntas asignadas al test
+        // Cargar las preguntas asignadas al test (todas las competencias de la prueba)
         List<TestQuestion> testQuestions = testQuestionRepository
-                .findByTestIdAndCompetenceIdAndIsActiveTrue(tried.getTestId(), tried.getCompetenceId());
+                .findByTestIdAndIsActiveTrue(tried.getTestId());
 
         List<TriedReviewDto.QuestionReview> questionReviews = new ArrayList<>();
 
@@ -161,6 +161,7 @@ public class TriedService {
 
             questionReviews.add(TriedReviewDto.QuestionReview.builder()
                     .questionId(question.getQuestionId())
+                    .competenceId(tq.getCompetenceId())
                     .statement(question.getStatement())
                     .explanation(question.getExplanation())
                     .source(question.getSource())
@@ -176,7 +177,6 @@ public class TriedService {
                 .triedId(tried.getTriedId())
                 .testId(tried.getTestId())
                 .testName(tried.getTest() != null ? tried.getTest().getTestName() : null)
-                .competenceId(tried.getCompetenceId())
                 .status(tried.getStatus())
                 .score(tried.getScore())
                 .totalQuestions(tried.getTotalQuestions())
@@ -196,19 +196,23 @@ public class TriedService {
      * uno nuevo. Los intentos son ilimitados, así que haber finalizado antes no bloquea.
      */
     @Transactional(readOnly = true)
-    public TriedEligibilityDto checkEligibility(String testId, String competenceId, UserPrincipal principal) {
-        Test test = testRepository.findById(new TestPK(testId, competenceId)).orElse(null);
+    public TriedEligibilityDto checkEligibility(String testId, UserPrincipal principal) {
+        Test test = testRepository.findByTestId(testId).orElse(null);
         if (test == null)
             return new TriedEligibilityDto(false, "La prueba no existe.", false, false, null);
 
         boolean active = Boolean.TRUE.equals(test.getIsActive());
-        boolean hasQuestions = !testQuestionRepository
-                .findByTestIdAndCompetenceIdAndIsActiveTrue(testId, competenceId).isEmpty();
+        // Test-wide: cuenta las preguntas de todas las competencias asociadas a la prueba.
+        int assignedCount = (int) testQuestionRepository.countByTestIdAndIsActiveTrue(testId);
+        boolean hasQuestions = assignedCount > 0;
+        // Mínimo a presentar: si questionsToPresent está definido, debe haber al menos esa cantidad asignada.
+        Integer toPresent = test.getQuestionsToPresent();
+        boolean meetsMinimum = (toPresent == null) ? hasQuestions : assignedCount >= toPresent;
 
         String inProgressTriedId = triedRepository
                 .findInProgressByStudent(principal.getId(), principal.getProgramId())
                 .stream()
-                .filter(t -> t.getTestId().equals(testId) && t.getCompetenceId().equals(competenceId))
+                .filter(t -> t.getTestId().equals(testId))
                 .map(Tried::getTriedId)
                 .findFirst()
                 .orElse(null);
@@ -219,8 +223,13 @@ public class TriedService {
         if (!hasQuestions)
             return new TriedEligibilityDto(false, "Esta prueba aún no tiene preguntas asignadas.",
                     true, false, inProgressTriedId);
+        if (!meetsMinimum)
+            return new TriedEligibilityDto(false,
+                    "La prueba requiere mostrar " + toPresent + " preguntas pero solo tiene "
+                            + assignedCount + " asignada(s). No se puede iniciar hasta completar el banco.",
+                    true, false, inProgressTriedId);
 
-        // Activa y con preguntas: puede entrar (iniciar nuevo o reanudar el activo).
+        // Activa y con suficientes preguntas: puede entrar (iniciar nuevo o reanudar el activo).
         return new TriedEligibilityDto(true, null, true, true, inProgressTriedId);
     }
 
@@ -228,7 +237,7 @@ public class TriedService {
 
     @Transactional
     public TriedDto startTried(StartTriedRequest req, UserPrincipal principal) {
-        Test test = testRepository.findById(new TestPK(req.getTestId(), req.getCompetenceId()))
+        Test test = testRepository.findByTestId(req.getTestId())
                 .orElseThrow(() -> new ResourceNotFoundException("Test", req.getTestId()));
 
         if (!Boolean.TRUE.equals(test.getIsActive()))
@@ -242,9 +251,16 @@ public class TriedService {
             throw new ApiException(ErrorCode.TRIED_IN_PROGRESS);
 
         List<TestQuestion> tqs = testQuestionRepository
-                .findByTestIdAndCompetenceIdAndIsActiveTrue(req.getTestId(), req.getCompetenceId());
+                .findByTestIdAndIsActiveTrue(req.getTestId());
         if (tqs.isEmpty())
             throw new ApiException(ErrorCode.TEST_NO_QUESTIONS);
+
+        // Validar mínimo: si el test pide presentar N preguntas, deben existir al menos N asignadas.
+        Integer toPresent = test.getQuestionsToPresent();
+        if (toPresent != null && tqs.size() < toPresent)
+            throw new ApiException(ErrorCode.TEST_NO_QUESTIONS,
+                    "La prueba requiere " + toPresent + " preguntas pero solo tiene "
+                            + tqs.size() + " asignada(s).");
 
         List<TestQuestion> selected = new ArrayList<>(tqs);
         if (test.getQuestionsToPresent() != null && test.getQuestionsToPresent() < tqs.size()) {
@@ -253,7 +269,6 @@ public class TriedService {
         }
 
         Tried tried = Tried.builder()
-                .competenceId(req.getCompetenceId())
                 .testId(req.getTestId())
                 .programId(principal.getProgramId())
                 .studentId(principal.getId())
@@ -293,18 +308,19 @@ public class TriedService {
         if (!"IN_PROGRESS".equals(tried.getStatus()))
             throw new ApiException(ErrorCode.TRIED_ALREADY_FINISHED);
 
-        Option selectedOption = optionRepository.findById(
-                        new OptionId(tried.getCompetenceId(), req.getQuestionId(), req.getOptionId()))
-                .orElseThrow(() -> new ApiException(ErrorCode.INVALID_OPTION));
-
         if (IdGenerator.UNANSWERED_OPTION_ID.equals(req.getOptionId()))
             throw new ApiException(ErrorCode.INVALID_OPTION);
 
-        // Verificar que la pregunta pertenece al test
-        boolean questionBelongs = testQuestionRepository
-                .existsByCompetenceIdAndTestIdAndQuestionId(tried.getCompetenceId(), tried.getTestId(), req.getQuestionId());
-        if (!questionBelongs)
-            throw new ApiException(ErrorCode.INVALID_INPUT, "Pregunta no pertenece a este test");
+        // Resolver la competencia REAL de la pregunta dentro de esta prueba
+        // (multi-competencia: puede diferir de la competencia principal del test).
+        TestQuestion tq = testQuestionRepository
+                .findByTestIdAndQuestionIdAndIsActiveTrue(tried.getTestId(), req.getQuestionId())
+                .orElseThrow(() -> new ApiException(ErrorCode.INVALID_INPUT, "Pregunta no pertenece a este test"));
+        String qComp = tq.getCompetenceId();
+
+        Option selectedOption = optionRepository.findById(
+                        new OptionId(qComp, req.getQuestionId(), req.getOptionId()))
+                .orElseThrow(() -> new ApiException(ErrorCode.INVALID_OPTION));
 
         // Buscar respuesta existente con lock para evitar inserciones duplicadas concurrentes
         var existingOpt = responseRepository.findByTriedIdAndQuestionIdForUpdate(triedId, req.getQuestionId());
@@ -317,7 +333,7 @@ public class TriedService {
         } else {
             responseRepository.save(StudentResponse.builder()
                     .studentResponseId(IdGenerator.studentResponseId(responseRepository.count()))
-                    .competenceId(tried.getCompetenceId())
+                    .competenceId(qComp)
                     .testId(tried.getTestId())
                     .programId(tried.getProgramId())
                     .studentId(tried.getStudentId())
@@ -365,7 +381,7 @@ public class TriedService {
                 .orElseThrow(() -> new ResourceNotFoundException("Intento", triedId));
         assertOwnership(tried, principal);
 
-        Test test = testRepository.findById(new TestPK(tried.getTestId(), tried.getCompetenceId()))
+        Test test = testRepository.findByTestId(tried.getTestId())
                 .orElse(null);
         Integer duration = (test != null) ? test.getDurationSeconds() : null;
         String  testMode = (test != null) ? test.getTestMode()        : null;
@@ -418,7 +434,7 @@ public class TriedService {
         if (!"IN_PROGRESS".equals(tried.getStatus()))
             return TriedDto.from(tried);
 
-        Test test = testRepository.findById(new TestPK(tried.getTestId(), tried.getCompetenceId()))
+        Test test = testRepository.findByTestId(tried.getTestId())
                 .orElse(null);
         if (test == null || "PRACTICE".equals(test.getTestMode()))
             return TriedDto.from(tried);  // la práctica no penaliza
@@ -486,8 +502,9 @@ public class TriedService {
         for (StudentResponse r : responses) {
             if (!Boolean.TRUE.equals(r.getIsCorrect())) continue;
             correct++;
+            // Multi-competencia: el peso se busca con la competencia REAL de la respuesta.
             earned += questionRepository
-                    .findByCompetenceIdAndQuestionId(tried.getCompetenceId(), r.getQuestionId())
+                    .findByCompetenceIdAndQuestionId(r.getCompetenceId(), r.getQuestionId())
                     .map(q -> difficultyWeight(q.getDifficultyLevel()))
                     .orElse(1);
         }
@@ -506,15 +523,16 @@ public class TriedService {
     }
 
     private void createUnansweredResponses(Tried tried) {
+        // Test-wide: cubre las preguntas de TODAS las competencias de la prueba.
         List<TestQuestion> testQuestions = testQuestionRepository
-                .findByTestIdAndCompetenceIdAndIsActiveTrue(tried.getTestId(), tried.getCompetenceId());
+                .findByTestIdAndIsActiveTrue(tried.getTestId());
         long base = responseRepository.count();
         int idx = 0;
         for (TestQuestion tq : testQuestions) {
             if (!responseRepository.existsByTriedIdAndQuestionId(tried.getTriedId(), tq.getQuestionId())) {
                 responseRepository.save(StudentResponse.builder()
                         .studentResponseId(IdGenerator.studentResponseId(base + idx))
-                        .competenceId(tried.getCompetenceId())
+                        .competenceId(tq.getCompetenceId())
                         .testId(tried.getTestId())
                         .programId(tried.getProgramId())
                         .studentId(tried.getStudentId())

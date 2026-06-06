@@ -64,4 +64,19 @@ public class AiTried {
     @Column(name = "theta", precision = 5, scale = 3)
     @Builder.Default
     private java.math.BigDecimal theta = java.math.BigDecimal.ZERO;
+
+    /** Nº de preguntas que la IA generó en la sesión (puede ser menor a total si se abandona). */
+    @Column(name = "questions_generated", nullable = false)
+    @Builder.Default
+    private Integer questionsGenerated = 0;
+
+    /** Nº de preguntas respondidas por el estudiante. */
+    @Column(name = "answered_questions", nullable = false)
+    @Builder.Default
+    private Integer answeredQuestions = 0;
+
+    /** Suma de los niveles de las preguntas generadas = puntaje máximo posible. */
+    @Column(name = "max_possible_score", nullable = false)
+    @Builder.Default
+    private Integer maxPossibleScore = 0;
 }

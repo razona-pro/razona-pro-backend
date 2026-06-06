@@ -23,17 +23,22 @@ public interface AiTriedRepository extends JpaRepository<AiTried, AiTriedId> {
     """)
     Page<AiTried> findForAdmin(@Param("studentId") String studentId, Pageable pageable);
 
-    /** Suma de score y conteo para ranking: sesiones IA FINISHED en el período [start,end] (null = sin límite). */
+    /**
+     * Suma de score y conteo para ranking: sesiones IA FINISHED en el período [start,end]
+     * (null = sin límite). Si competenceId no es null, solo cuenta esa competencia.
+     */
     @Query("""
         SELECT COALESCE(SUM(a.score), 0), COUNT(a)
         FROM AiTried a
         WHERE a.studentId = :studentId AND a.programId = :programId
           AND a.status = 'FINISHED' AND a.score IS NOT NULL
+          AND (:competenceId IS NULL OR a.competenceId = :competenceId)
           AND (:start IS NULL OR COALESCE(a.finishedAt, a.attemptTimestamp) >= :start)
           AND (:end   IS NULL OR COALESCE(a.finishedAt, a.attemptTimestamp) <= :end)
     """)
     java.util.List<Object[]> sumAiForRanking(@Param("studentId") String studentId,
                                              @Param("programId") String programId,
+                                             @Param("competenceId") String competenceId,
                                              @Param("start") java.time.LocalDateTime start,
                                              @Param("end")   java.time.LocalDateTime end);
 }

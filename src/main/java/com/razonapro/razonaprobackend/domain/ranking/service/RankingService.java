@@ -58,15 +58,22 @@ public class RankingService {
             LocalDateTime start = (ps != null) ? ps.atStartOfDay()        : null;
             LocalDateTime end   = (pe != null) ? pe.atTime(23, 59, 59)    : null;
             String src = r.getSourceFilter() == null ? "ALL" : r.getSourceFilter();
+            // Ranking por competencia: si competenceId != null, solo cuenta esa competencia.
+            String comp = (r.getCompetenceId() == null || r.getCompetenceId().isBlank())
+                    ? null : r.getCompetenceId();
 
             BigDecimal triedsScore = BigDecimal.ZERO; long triedsCount = 0;
             if (src.equals("ALL") || src.equals("TRIEDS")) {
-                Object[] row = first(triedRepository.sumTriedsForRanking(studentId, programId, start, end));
+                // General: suma el score del intento. Por competencia (multicompetencia):
+                // suma los puntos ponderados de las respuestas correctas de esa competencia.
+                Object[] row = (comp == null)
+                        ? first(triedRepository.sumTriedsForRanking(studentId, programId, start, end))
+                        : first(triedRepository.sumTriedsByCompetenceForRanking(studentId, programId, comp, start, end));
                 if (row != null) { triedsScore = toBig(row[0]); triedsCount = toLong(row[1]); }
             }
             BigDecimal aiScore = BigDecimal.ZERO; long aiCount = 0;
             if (src.equals("ALL") || src.equals("AI_TRIEDS")) {
-                Object[] row = first(aiTriedRepository.sumAiForRanking(studentId, programId, start, end));
+                Object[] row = first(aiTriedRepository.sumAiForRanking(studentId, programId, comp, start, end));
                 if (row != null) { aiScore = toBig(row[0]); aiCount = toLong(row[1]); }
             }
 
@@ -118,6 +125,8 @@ public class RankingService {
                 .description(req.getDescription())
                 .periodType(req.getPeriodType())
                 .sourceFilter(req.getSourceFilter())
+                .competenceId((req.getCompetenceId() == null || req.getCompetenceId().isBlank())
+                        ? null : req.getCompetenceId().trim())
                 .build();
         return RankingDto.from(rankingRepository.save(ranking));
     }
@@ -128,5 +137,28 @@ public class RankingService {
                 .orElseThrow(() -> new ResourceNotFoundException("Ranking", id));
         r.setIsActive(false);
         rankingRepository.save(r);
+    }
+
+    /** Reactiva un ranking (como en las demás tablas con soft-delete). */
+    @Transactional
+    public RankingDto activate(String id) {
+        Ranking r = rankingRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Ranking", id));
+        r.setIsActive(true);
+        return RankingDto.from(rankingRepository.save(r));
+    }
+
+    /** Edita los campos editables de un ranking. */
+    @Transactional
+    public RankingDto update(String id, RankingRequest req) {
+        Ranking r = rankingRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Ranking", id));
+        if (req.getRankingName()  != null) r.setRankingName(req.getRankingName());
+        if (req.getDescription()  != null) r.setDescription(req.getDescription());
+        if (req.getPeriodType()   != null) r.setPeriodType(req.getPeriodType());
+        if (req.getSourceFilter() != null) r.setSourceFilter(req.getSourceFilter());
+        r.setCompetenceId((req.getCompetenceId() == null || req.getCompetenceId().isBlank())
+                ? null : req.getCompetenceId().trim());
+        return RankingDto.from(rankingRepository.save(r));
     }
 }

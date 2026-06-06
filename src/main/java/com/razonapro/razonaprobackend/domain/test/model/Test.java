@@ -1,8 +1,6 @@
 package com.razonapro.razonaprobackend.domain.test.model;
 
 import com.razonapro.razonaprobackend.domain.admin.model.Admin;
-import com.razonapro.razonaprobackend.domain.competence.model.Competence;
-import com.razonapro.razonaprobackend.shared.ids.TestPK;
 import com.razonapro.razonaprobackend.shared.jpa.Normalizable;
 import com.razonapro.razonaprobackend.shared.jpa.NormalizingEntityListener;
 import com.razonapro.razonaprobackend.shared.util.StringNormalizer;
@@ -14,21 +12,14 @@ import java.time.LocalDateTime;
 @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
 @Entity
 @Table(name = "tests")
-@IdClass(TestPK.class)
 @EntityListeners(NormalizingEntityListener.class)
 public class Test implements Normalizable {
 
+    /** Identidad de la prueba. Una prueba es MULTICOMPETENCIA: sus competencias
+     *  son las de sus preguntas (tabla tests_questions). */
     @Id
     @Column(name = "test_id", length = 8)
     private String testId;
-
-    @Id
-    @Column(name = "competence_id", length = 6)
-    private String competenceId;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "competence_id", insertable = false, updatable = false)
-    private Competence competence;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "admin_id")

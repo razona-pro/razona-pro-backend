@@ -28,11 +28,10 @@ public class TestController {
 
     private final TestService testService;
 
-    @PutMapping("/{testId}/{competenceId}/activate")
+    @PutMapping("/{testId}/activate")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<TestDto>> activate(
-            @PathVariable String testId, @PathVariable String competenceId) {
-        return ResponseEntity.ok(ApiResponse.ok(testService.activate(testId, competenceId)));
+    public ResponseEntity<ApiResponse<TestDto>> activate(@PathVariable String testId) {
+        return ResponseEntity.ok(ApiResponse.ok(testService.activate(testId)));
     }
 
     @GetMapping
@@ -47,22 +46,21 @@ public class TestController {
                 testService.findAll(PageRequest.of(page, size, Sort.by("createdAt").descending()), !isAdmin)));
     }
 
-    @GetMapping("/{testId}/{competenceId}")
+    @GetMapping("/{testId}")
     @PreAuthorize("hasAnyRole('ADMIN','STUDENT')")
-    public ResponseEntity<ApiResponse<TestDto>> findById(
-            @PathVariable String testId, @PathVariable String competenceId) {
-        return ResponseEntity.ok(ApiResponse.ok(testService.findById(testId, competenceId)));
+    public ResponseEntity<ApiResponse<TestDto>> findById(@PathVariable String testId) {
+        return ResponseEntity.ok(ApiResponse.ok(testService.findById(testId)));
     }
 
-    @GetMapping("/{testId}/{competenceId}/questions")
+    @GetMapping("/{testId}/questions")
     @PreAuthorize("hasAnyRole('ADMIN','STUDENT')")
     public ResponseEntity<ApiResponse<List<QuestionDto>>> getQuestions(
-            @PathVariable String testId, @PathVariable String competenceId,
+            @PathVariable String testId,
             @AuthenticationPrincipal UserPrincipal principal) {
         boolean showCorrect = principal.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
         return ResponseEntity.ok(ApiResponse.ok(
-                testService.getTestQuestions(testId, competenceId, showCorrect)));
+                testService.getTestQuestions(testId, showCorrect)));
     }
 
     @PostMapping
@@ -74,7 +72,8 @@ public class TestController {
                 .body(ApiResponse.ok(testService.create(req, principal)));
     }
 
-    @PostMapping("/{testId}/{competenceId}/questions/{questionId}")
+    // La competencia del path = competencia de la PREGUNTA (una prueba es multicompetencia).
+    @PostMapping("/{testId}/questions/{competenceId}/{questionId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> addQuestion(
             @PathVariable String testId, @PathVariable String competenceId, @PathVariable String questionId,
@@ -83,7 +82,7 @@ public class TestController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok("Pregunta agregada al test"));
     }
 
-    @DeleteMapping("/{testId}/{competenceId}/questions/{questionId}")
+    @DeleteMapping("/{testId}/questions/{competenceId}/{questionId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> removeQuestion(
             @PathVariable String testId, @PathVariable String competenceId, @PathVariable String questionId) {
@@ -91,11 +90,10 @@ public class TestController {
         return ResponseEntity.ok(ApiResponse.ok("Pregunta removida del test"));
     }
 
-    @DeleteMapping("/{testId}/{competenceId}")
+    @DeleteMapping("/{testId}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> deactivate(
-            @PathVariable String testId, @PathVariable String competenceId) {
-        testService.deactivate(testId, competenceId);
+    public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable String testId) {
+        testService.deactivate(testId);
         return ResponseEntity.ok(ApiResponse.ok("Test desactivado"));
     }
 }

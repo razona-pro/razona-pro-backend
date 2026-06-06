@@ -15,8 +15,11 @@ public class AiTriedDto {
     private String competenceId;
     private String status;
     private BigDecimal score;
-    private Integer totalQuestions;
+    private Integer totalQuestions;       // preguntas solicitadas al iniciar
     private Integer correctAnswers;
+    private Integer questionsGenerated;   // preguntas realmente generadas por la IA
+    private Integer answeredQuestions;    // preguntas respondidas
+    private Integer maxPossibleScore;     // puntaje máximo posible (suma de niveles generados)
     private Integer timeSpentSeconds;
     private String description;
     private LocalDateTime attemptTimestamp;
@@ -32,6 +35,9 @@ public class AiTriedDto {
                 .score(a.getScore())
                 .totalQuestions(a.getTotalQuestions())
                 .correctAnswers(a.getCorrectAnswers())
+                .questionsGenerated(a.getQuestionsGenerated())
+                .answeredQuestions(a.getAnsweredQuestions())
+                .maxPossibleScore(a.getMaxPossibleScore())
                 .timeSpentSeconds(a.getTimeSpentSeconds())
                 .description(a.getDescription())
                 .attemptTimestamp(a.getAttemptTimestamp())

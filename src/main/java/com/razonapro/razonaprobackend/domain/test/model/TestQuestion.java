@@ -30,11 +30,9 @@ public class TestQuestion {
     @Column(name = "test_id", length = 8, nullable = false)
     private String testId;
 
+    // Multicompetencia: el test se referencia solo por test_id (tests ya no tiene competencia).
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumns({
-            @JoinColumn(name = "test_id",       referencedColumnName = "test_id",       insertable = false, updatable = false),
-            @JoinColumn(name = "competence_id", referencedColumnName = "competence_id", insertable = false, updatable = false)
-    })
+    @JoinColumn(name = "test_id", referencedColumnName = "test_id", insertable = false, updatable = false)
     private Test test;
 
     @Column(name = "question_id", length = 7, nullable = false)

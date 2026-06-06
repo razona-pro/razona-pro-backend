@@ -32,6 +32,10 @@ public class Ranking implements Normalizable {
     @Column(name = "source_filter", length = 10, nullable = false)
     private String sourceFilter;
 
+    /** Competencia del ranking. null = ranking general (todas las competencias). */
+    @Column(name = "competence_id", length = 6)
+    private String competenceId;
+
     @Column(name = "is_active", columnDefinition = "CHAR(1)", nullable = false)
     @Builder.Default
     private Boolean isActive = true;

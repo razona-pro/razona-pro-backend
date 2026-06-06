@@ -22,4 +22,8 @@ public class RankingRequest {
     @NotBlank
     @Pattern(regexp = "^(ALL|TRIEDS|AI_TRIEDS)$")
     private String sourceFilter;
+
+    /** Competencia del ranking (opcional). Vacío/null = ranking general de todas las competencias. */
+    @Size(max = 6)
+    private String competenceId;
 }

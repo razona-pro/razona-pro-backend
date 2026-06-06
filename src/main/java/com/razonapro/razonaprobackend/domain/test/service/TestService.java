@@ -48,41 +48,53 @@ public class TestService {
     private final NotificationService    notificationService;
 
     @Transactional
-    public TestDto activate(String testId, String competenceId) {
-        Test test = testRepository.findById(new TestPK(testId, competenceId))
+    public TestDto activate(String testId) {
+        Test test = testRepository.findByTestId(testId)
                 .orElseThrow(() -> new ResourceNotFoundException("Test", testId));
         test.setIsActive(true);
         return TestDto.from(testRepository.save(test));
     }
 
-    private Map<String, Long> getDifficultyBreakdown(String testId, String competenceId) {
+    private Map<String, Long> getDifficultyBreakdown(String testId) {
+        // Test-wide: la prueba puede tener preguntas de varias competencias.
         Map<String, Long> breakdown = new HashMap<>();
-        testQuestionRepository.countByDifficulty(testId, competenceId)
+        testQuestionRepository.countByDifficultyTestWide(testId)
                 .forEach(r -> breakdown.put((String) r[0], (Long) r[1]));
         return breakdown;
+    }
+
+    /** Competencias asociadas a la prueba (las de sus preguntas activas). */
+    private List<TestDto.CompetenceRef> getTestCompetences(String testId) {
+        return testQuestionRepository.findDistinctCompetenceIdsByTestId(testId).stream()
+                .map(cid -> TestDto.CompetenceRef.builder()
+                        .competenceId(cid)
+                        .competenceName(competenceRepository.findById(cid)
+                                .map(c -> c.getCompetenceName()).orElse(cid))
+                        .build())
+                .toList();
     }
 
     @Transactional(readOnly = true)
     public PagedResponse<TestDto> findAll(Pageable pageable, boolean activeOnly) {
         Page<Test> page = activeOnly
-                ? testRepository.findAllActiveWithCompetence(pageable)
-                : testRepository.findAllWithCompetence(pageable);
+                ? testRepository.findByIsActiveTrue(pageable)
+                : testRepository.findAll(pageable);
         return PagedResponse.from(page.map(t ->
-                TestDto.from(t, getDifficultyBreakdown(t.getTestId(), t.getCompetenceId()))));
+                TestDto.from(t, getDifficultyBreakdown(t.getTestId()), getTestCompetences(t.getTestId()))));
     }
 
     @Transactional(readOnly = true)
-    public TestDto findById(String testId, String competenceId) {
-        Test test = testRepository.findById(new TestPK(testId, competenceId))
+    public TestDto findById(String testId) {
+        Test test = testRepository.findByTestId(testId)
                 .orElseThrow(() -> new ResourceNotFoundException("Test", testId));
-        return TestDto.from(test, getDifficultyBreakdown(testId, competenceId));
+        return TestDto.from(test, getDifficultyBreakdown(testId), getTestCompetences(testId));
     }
 
     @Transactional(readOnly = true)
-    public List<QuestionDto> getTestQuestions(String testId, String competenceId, boolean showCorrect) {
-        List<TestQuestion> tqs = testQuestionRepository
-                .findByTestIdAndCompetenceIdAndIsActiveTrue(testId, competenceId);
-        Test test = testRepository.findById(new TestPK(testId, competenceId))
+    public List<QuestionDto> getTestQuestions(String testId, boolean showCorrect) {
+        // Test-wide: incluye preguntas de TODAS las competencias asociadas a la prueba.
+        List<TestQuestion> tqs = testQuestionRepository.findByTestIdAndIsActiveTrue(testId);
+        Test test = testRepository.findByTestId(testId)
                 .orElseThrow(() -> new ResourceNotFoundException("Test", testId));
 
         List<TestQuestion> selected = tqs;
@@ -109,13 +121,10 @@ public class TestService {
 
     @Transactional
     public TestDto create(TestRequest req, UserPrincipal principal) {
-        competenceRepository.findById(req.getCompetenceId())
-                .orElseThrow(() -> new ResourceNotFoundException("Competencia", req.getCompetenceId()));
-
         String normalizedName = req.getTestName().trim();
-        if (testRepository.existsByTestNameIgnoreCaseAndCompetenceId(normalizedName, req.getCompetenceId())) {
+        if (testRepository.existsByTestNameIgnoreCase(normalizedName)) {
             throw new ApiException(ErrorCode.DUPLICATE_RESOURCE,
-                    "Ya existe un test con el nombre \"" + req.getTestName() + "\" en esta competencia.");
+                    "Ya existe una prueba con el nombre \"" + req.getTestName() + "\".");
         }
 
         // EXAM y TIMED requieren tiempo; PRACTICE puede ser sin tiempo (null)
@@ -126,7 +135,6 @@ public class TestService {
 
         Test test = Test.builder()
                 .testId(IdGenerator.testId(testRepository.count()))
-                .competenceId(req.getCompetenceId())
                 .admin(adminRepository.findById(principal.getId())
                         .orElseThrow(() -> new ResourceNotFoundException("Admin", principal.getId())))
                 .testName(req.getTestName())
@@ -138,27 +146,24 @@ public class TestService {
 
         Test saved = testRepository.save(test);
 
-        // El admin decide si notifica a todos los estudiantes al publicar el test
+        // El admin decide si notifica a todos los estudiantes al publicar la prueba.
         if (!Boolean.FALSE.equals(req.getNotifyStudents())) {
-            notificationService.broadcastNewTest(saved.getTestName(),
-                    competenceRepository.findById(req.getCompetenceId())
-                            .map(c -> c.getCompetenceName()).orElse(req.getCompetenceId()));
+            notificationService.broadcastNewTest(saved.getTestName(), "varias competencias");
         }
 
         return TestDto.from(saved);
     }
 
     @Transactional
-    public TestDto update(String testId, String competenceId, TestUpdateRequest req, UserPrincipal principal) {
-        Test test = testRepository.findById(new TestPK(testId, competenceId))
+    public TestDto update(String testId, TestUpdateRequest req, UserPrincipal principal) {
+        Test test = testRepository.findByTestId(testId)
                 .orElseThrow(() -> new ResourceNotFoundException("Test", testId));
 
         if (StringUtils.hasText(req.getTestName())) {
             String normalizedName = req.getTestName().trim();
-            if (testRepository.existsByTestNameIgnoreCaseAndCompetenceIdAndTestIdNot(
-                    normalizedName, competenceId, testId)) {
+            if (testRepository.existsByTestNameIgnoreCaseAndTestIdNot(normalizedName, testId)) {
                 throw new ApiException(ErrorCode.DUPLICATE_RESOURCE,
-                        "Ya existe un test con ese nombre en esta competencia.");
+                        "Ya existe una prueba con ese nombre.");
             }
             test.setTestName(req.getTestName());
         }
@@ -173,12 +178,14 @@ public class TestService {
 
     @Transactional
     public void addQuestion(String testId, String competenceId, String questionId, UserPrincipal principal) {
-        testRepository.findById(new TestPK(testId, competenceId))
+        // competenceId aquí = competencia de la PREGUNTA (puede diferir de la principal del test).
+        testRepository.findByTestId(testId)
                 .orElseThrow(() -> new ResourceNotFoundException("Test", testId));
         questionRepository.findById(new QuestionId(competenceId, questionId))
                 .orElseThrow(() -> new ResourceNotFoundException("Pregunta", questionId));
 
-        long order = testQuestionRepository.countByTestIdAndCompetenceId(testId, competenceId) + 1;
+        // El orden es test-wide (sobre todas las competencias de la prueba).
+        long order = testQuestionRepository.countByTestIdAndIsActiveTrue(testId) + 1;
 
         // Si ya existe una fila (la constraint UNIQUE es por question_id, no por estado):
         //  - activa  → realmente está duplicada
@@ -211,8 +218,8 @@ public class TestService {
     }
 
     @Transactional
-    public void deactivate(String testId, String competenceId) {
-        Test test = testRepository.findById(new TestPK(testId, competenceId))
+    public void deactivate(String testId) {
+        Test test = testRepository.findByTestId(testId)
                 .orElseThrow(() -> new ResourceNotFoundException("Test", testId));
         test.setIsActive(false);
         testRepository.save(test);

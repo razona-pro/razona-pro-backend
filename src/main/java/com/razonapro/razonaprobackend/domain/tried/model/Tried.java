@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
 @IdClass(TriedId.class)
 public class Tried {
 
-    @Id @Column(name = "competence_id", length = 6) private String competenceId;
+    // Multicompetencia: el intento es de una PRUEBA (test_id), no de una competencia.
     @Id @Column(name = "test_id",       length = 8) private String testId;
     @Id @Column(name = "program_id",    length = 3) private String programId;
     @Id @Column(name = "student_id",    length = 7) private String studentId;
@@ -29,10 +29,7 @@ public class Tried {
     private Student student;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumns({
-            @JoinColumn(name = "test_id",       referencedColumnName = "test_id",       insertable = false, updatable = false),
-            @JoinColumn(name = "competence_id", referencedColumnName = "competence_id", insertable = false, updatable = false)
-    })
+    @JoinColumn(name = "test_id", referencedColumnName = "test_id", insertable = false, updatable = false)
     private Test test;
 
     /** IN_PROGRESS | FINISHED | ABANDONED | TIMED_OUT | ANULADO (anulado por fraude) */

@@ -20,7 +20,6 @@ public class TriedDto {
     private String        programId;
     private String        testId;
     private String        testName;
-    private String        competenceId;
     private String        status;
     private BigDecimal    score;
     private Integer       totalQuestions;
@@ -38,7 +37,6 @@ public class TriedDto {
                 .programId(t.getProgramId())
                 .testId(t.getTestId())
                 .testName(t.getTest() != null ? t.getTest().getTestName() : null)
-                .competenceId(t.getCompetenceId())
                 .status(t.getStatus())
                 .score(t.getScore())
                 .totalQuestions(t.getTotalQuestions())
@@ -54,7 +52,6 @@ public class TriedDto {
         return TriedDto.builder()
                 .triedId(t.getTriedId())
                 .testId(t.getTestId())
-                .competenceId(t.getCompetenceId())
                 .status(t.getStatus())
                 .totalQuestions(t.getTotalQuestions())
                 .attemptTimestamp(t.getAttemptTimestamp())

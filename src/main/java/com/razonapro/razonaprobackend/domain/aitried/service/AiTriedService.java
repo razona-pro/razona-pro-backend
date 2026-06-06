@@ -149,8 +149,9 @@ public class AiTriedService {
                 .build();
         aiTriedRepository.save(at);
 
-        // Primera pregunta en el nivel que corresponde al theta acumulado del usuario
-        AiQuestion first = generateAndSave(at, comp, 1, thetaToDifficulty(priorTheta));
+        // Primera pregunta en el nivel inicial del usuario (derivado del progreso acumulado).
+        AiQuestion first = generateAndSave(at, comp, 1, startLevel(priorTheta));
+        aiTriedRepository.save(at);   // persistir questionsGenerated / maxPossibleScore
         return new AiStartResponseDto(AiTriedDto.from(at), toDto(first, req.getTotalQuestions(), false), 1);
     }
 
@@ -168,18 +169,17 @@ public class AiTriedService {
         if (nextOrder > at.getTotalQuestions())
             throw new ApiException(ErrorCode.TRIED_ALREADY_FINISHED, "Ya se generaron todas las preguntas.");
 
-        // Calcular theta actualizado (sembrado con el acumulado del usuario) y dificultad objetivo
-        double prior    = loadPriorTheta(at.getProgramId(), at.getStudentId(), at.getCompetenceId());
-        double theta    = computeTheta(existing, prior);
-        int    target   = thetaToDifficulty(theta);
+        // Dificultad objetivo según la máquina de niveles (3 aciertos suben, 2 fallos bajan).
+        double prior  = loadPriorTheta(at.getProgramId(), at.getStudentId(), at.getCompetenceId());
+        int    target = computeLevel(existing, startLevel(prior)).level();
 
         Competence comp = competenceRepository.findById(at.getCompetenceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Competencia", at.getCompetenceId()));
 
         AiQuestion q = generateAndSave(at, comp, nextOrder, target);
 
-        // Persistir theta actualizado
-        at.setTheta(BigDecimal.valueOf(theta).setScale(3, RoundingMode.HALF_UP));
+        // Persistir el nivel alcanzado como theta (para el progreso acumulado del usuario)
+        at.setTheta(BigDecimal.valueOf(levelToTheta(target)).setScale(3, RoundingMode.HALF_UP));
         aiTriedRepository.save(at);
 
         return toDto(q, at.getTotalQuestions(), false);
@@ -236,6 +236,7 @@ public class AiTriedService {
         int correctCount= (int) all.stream().filter(x -> Boolean.TRUE.equals(x.getIsCorrect())).count();
 
         at.setCorrectAnswers(correctCount);
+        at.setAnsweredQuestions((int) answered);
 
         boolean finished = answered >= at.getTotalQuestions();
         boolean hasNext  = !finished;
@@ -247,9 +248,9 @@ public class AiTriedService {
             finishAiTried(at, all);
             finalScore = at.getScore() != null ? at.getScore().doubleValue() : 0.0;
         } else {
-            double theta = computeTheta(all, prior);
-            nextDiff = thetaToDifficulty(theta);
-            at.setTheta(BigDecimal.valueOf(theta).setScale(3, RoundingMode.HALF_UP));
+            // Siguiente nivel según la máquina por niveles (smurfing).
+            nextDiff = computeLevel(all, startLevel(prior)).level();
+            at.setTheta(BigDecimal.valueOf(levelToTheta(nextDiff)).setScale(3, RoundingMode.HALF_UP));
         }
         aiTriedRepository.save(at);
 
@@ -343,7 +344,11 @@ public class AiTriedService {
                 .explanation(clean(g.explanation()))
                 .difficultyLevel(Math.max(1, Math.min(10, g.difficultyLevel())))
                 .build();
-        return aiQuestionRepository.save(q);
+        AiQuestion saved = aiQuestionRepository.save(q);
+        // Actualizar métricas de la sesión (sirven incluso si el intento se abandona).
+        at.setQuestionsGenerated((at.getQuestionsGenerated() == null ? 0 : at.getQuestionsGenerated()) + 1);
+        at.setMaxPossibleScore((at.getMaxPossibleScore() == null ? 0 : at.getMaxPossibleScore()) + saved.getDifficultyLevel());
+        return saved;
     }
 
     /** Normaliza el texto de la IA: reemplaza guiones largos (- – ―) por uno normal (-). */
@@ -363,18 +368,28 @@ public class AiTriedService {
         at.setStatus("FINISHED");
         at.setFinishedAt(LocalDateTime.now());
 
-        int earned = 0, correct = 0, answered = 0;
+        int earned = 0, correct = 0, answered = 0, maxPts = 0;
         for (AiQuestion q : questions) {
             int pts = q.getDifficultyLevel() != null ? q.getDifficultyLevel() : 5;
+            maxPts += pts;
             if (q.getSelectedIndex() != null) answered++;
             if (Boolean.TRUE.equals(q.getIsCorrect())) { earned += pts; correct++; }
         }
-        at.setCorrectAnswers(correct);
-        at.setScore(BigDecimal.valueOf(earned).setScale(2, RoundingMode.HALF_UP));
 
-        // IRT acumulativo: actualizar el theta del usuario en esta competencia
-        double prior = loadPriorTheta(at.getProgramId(), at.getStudentId(), at.getCompetenceId());
-        double finalTheta = computeTheta(questions, prior);
+        // Lógica por niveles + recompensa por racha de subir de nivel (smurfing).
+        double prior   = loadPriorTheta(at.getProgramId(), at.getStudentId(), at.getCompetenceId());
+        LevelState st  = computeLevel(questions, startLevel(prior));
+        int bonus      = st.bonus();
+
+        at.setCorrectAnswers(correct);
+        at.setAnsweredQuestions(answered);
+        at.setQuestionsGenerated(questions.size());
+        at.setMaxPossibleScore(maxPts);
+        // El puntaje final pondera por nivel y suma el bonus por rachas de ascenso.
+        at.setScore(BigDecimal.valueOf(earned + bonus).setScale(2, RoundingMode.HALF_UP));
+
+        // Progreso acumulado: persistir el nivel alcanzado como theta.
+        double finalTheta = levelToTheta(st.level());
         at.setTheta(BigDecimal.valueOf(finalTheta).setScale(3, RoundingMode.HALF_UP));
         persistTheta(at, finalTheta, answered);
 
@@ -428,25 +443,54 @@ public class AiTriedService {
         return new int[]{earned, max};
     }
 
-    /** Estimación theta con IRT 1PL simplificado, sembrada con el theta previo (acumulativo). */
-    private double computeTheta(List<AiQuestion> questions, double seed) {
-        double theta = Math.max(-3.0, Math.min(3.0, seed));
+    /** Resultado de reproducir la sesión con la máquina de niveles. */
+    private record LevelState(int level, int correctStreak, int wrongStreak, int climbStreak, int bonus) {}
+
+    /**
+     * Lógica de niveles tipo "ranked" (smurfing):
+     *  - 3 aciertos SEGUIDOS → sube un nivel (resetea la racha de aciertos).
+     *  - 2 fallos SEGUIDOS   → baja un nivel (resetea la racha de fallos).
+     *  - Tras bajar hay que volver a encadenar 3 aciertos para subir.
+     *  - Subir de nivel en racha otorga puntos de bonificación crecientes (1, 2, 3, ...);
+     *    un fallo rompe la racha de ascenso y reinicia la bonificación.
+     * Reproduce solo las preguntas YA respondidas, en orden.
+     */
+    private LevelState computeLevel(List<AiQuestion> questions, int startLevel) {
+        int level = Math.max(1, Math.min(10, startLevel));
+        int correctStreak = 0, wrongStreak = 0, climbStreak = 0, bonus = 0;
         for (AiQuestion q : questions) {
             if (q.getSelectedIndex() == null) continue;
-            double b = (q.getDifficultyLevel() - 5.5) * (6.0 / 9.0);
-            double p = 1.0 / (1.0 + Math.exp(b - theta));
-            theta += Boolean.TRUE.equals(q.getIsCorrect())
-                    ? 0.35 * (1.0 - p)
-                    : -0.35 * p;
-            theta = Math.max(-3.0, Math.min(3.0, theta));
+            if (Boolean.TRUE.equals(q.getIsCorrect())) {
+                correctStreak++;
+                wrongStreak = 0;
+                if (correctStreak >= 3) {
+                    correctStreak = 0;
+                    if (level < 10) level++;
+                    climbStreak++;
+                    bonus += climbStreak;   // recompensa creciente por racha de ascenso
+                }
+            } else {
+                wrongStreak++;
+                correctStreak = 0;
+                climbStreak = 0;            // romper la racha reinicia la bonificación
+                if (wrongStreak >= 2) {
+                    wrongStreak = 0;
+                    if (level > 1) level--;
+                }
+            }
         }
-        return theta;
+        return new LevelState(level, correctStreak, wrongStreak, climbStreak, bonus);
     }
 
-    /** Convierte theta (-3..+3) a nivel de dificultad (1..10). */
-    private int thetaToDifficulty(double theta) {
+    /** Nivel inicial (1..10) del usuario a partir de su progreso acumulado (theta). */
+    private int startLevel(double theta) {
         int level = (int) Math.round(5.5 + theta * (9.0 / 6.0));
         return Math.max(1, Math.min(10, level));
+    }
+
+    /** Inverso de startLevel: convierte un nivel (1..10) a theta (-3..+3) para persistir el progreso. */
+    private double levelToTheta(int level) {
+        return (Math.max(1, Math.min(10, level)) - 5.5) * (6.0 / 9.0);
     }
 
     private AiQuestionDto toDto(AiQuestion q, int total, boolean reveal) {
