@@ -141,6 +141,23 @@ public class EmailService {
         send(toEmail, "Bienvenido a RazonaPro", base(content));
     }
 
+    // ── Credenciales de administrador (cuenta creada por otro admin) ──────
+
+    @Async
+    public void sendAdminCredentialsEmail(String toEmail, String name, String rawPassword) {
+        String link    = appProperties.getFrontendUrl() + "/auth";
+        String display = capitalize(name);
+        String content =
+            h1("Tu cuenta de administrador está lista") +
+            p("Hola, <strong>" + display + "</strong>. Se creó una cuenta de administrador en " +
+              "RazonaPro asociada a este correo. Estas son tus credenciales de acceso:") +
+            infoBox("<strong>Correo:</strong> " + toEmail + "<br>" +
+                    "<strong>Contraseña temporal:</strong> " + rawPassword) +
+            btn(link, "Iniciar sesión") +
+            p("Por seguridad, te recomendamos cambiar la contraseña después de iniciar sesión.");
+        send(toEmail, "Acceso de administrador - RazonaPro", base(content));
+    }
+
     // ── Restablecimiento de contraseña ────────────────────────────────────
 
     @Async

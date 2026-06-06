@@ -5,6 +5,7 @@ import com.razonapro.razonaprobackend.domain.aitried.dto.request.StartAiTriedReq
 import com.razonapro.razonaprobackend.domain.aitried.dto.request.SubmitAiAnswerRequest;
 import com.razonapro.razonaprobackend.domain.aitried.dto.response.*;
 import com.razonapro.razonaprobackend.domain.aitried.service.AiTriedService;
+import com.razonapro.razonaprobackend.domain.ranking.service.RankingService;
 import com.razonapro.razonaprobackend.infrastructure.security.UserPrincipal;
 import com.razonapro.razonaprobackend.shared.dto.ApiResponse;
 import com.razonapro.razonaprobackend.shared.dto.PagedResponse;
@@ -12,6 +13,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/ai-trieds")
 @RequiredArgsConstructor
@@ -30,6 +33,13 @@ import java.util.List;
 public class AiTriedController {
 
     private final AiTriedService service;
+    private final RankingService rankingService;
+
+    /** Refresca el ranking sin afectar la respuesta: si falla, solo se loguea. */
+    private void refreshRanking(UserPrincipal p) {
+        try { rankingService.refreshForStudent(p.getId(), p.getProgramId(), null); }
+        catch (Exception e) { log.warn("No se pudo refrescar el ranking de {}: {}", p.getId(), e.getMessage()); }
+    }
 
     @GetMapping("/status")
     public ResponseEntity<ApiResponse<AiStatusDto>> status() {
@@ -50,6 +60,17 @@ public class AiTriedController {
     public ResponseEntity<ApiResponse<AiTriedDto>> findById(
             @PathVariable String aiTriedId, @AuthenticationPrincipal UserPrincipal p) {
         return ResponseEntity.ok(ApiResponse.ok(service.findById(aiTriedId, p)));
+    }
+
+    @GetMapping("/admin/all")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Admin: historial de todas las sesiones IA (studentId es filtro opcional)")
+    public ResponseEntity<ApiResponse<PagedResponse<AiTriedDto>>> findAll(
+            @RequestParam(required = false) String studentId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(ApiResponse.ok(service.findAllForAdmin(studentId,
+                PageRequest.of(page, size, Sort.by("attemptTimestamp").descending()))));
     }
 
     @GetMapping("/student/{programId}/{studentId}")
@@ -106,7 +127,9 @@ public class AiTriedController {
     public ResponseEntity<ApiResponse<AiAnswerResultDto>> answer(
             @PathVariable String aiTriedId, @Valid @RequestBody SubmitAiAnswerRequest req,
             @AuthenticationPrincipal UserPrincipal p) {
-        return ResponseEntity.ok(ApiResponse.ok(service.submitAnswer(aiTriedId, req, p)));
+        AiAnswerResultDto result = service.submitAnswer(aiTriedId, req, p);
+        if (result.finished()) refreshRanking(p);   // ya comprometido; refresco best-effort
+        return ResponseEntity.ok(ApiResponse.ok(result));
     }
 
     @PostMapping("/{aiTriedId}/hint")
@@ -123,7 +146,8 @@ public class AiTriedController {
             @PathVariable String aiTriedId,
             @RequestParam(required = false) Integer timeSpentSeconds,
             @AuthenticationPrincipal UserPrincipal p) {
-        return ResponseEntity.ok(ApiResponse.ok("Sesión finalizada",
-                service.finish(aiTriedId, timeSpentSeconds, p)));
+        AiTriedDto dto = service.finish(aiTriedId, timeSpentSeconds, p);
+        refreshRanking(p);
+        return ResponseEntity.ok(ApiResponse.ok("Sesión finalizada", dto));
     }
 }

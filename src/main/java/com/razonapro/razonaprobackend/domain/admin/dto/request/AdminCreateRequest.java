@@ -12,17 +12,8 @@ public class AdminCreateRequest {
     @NotBlank @Size(max = 15) private String firstSurname;
     @Size(max = 15)           private String secondSurname;
 
+    // Solo se pide el correo: la contraseña se genera y se envía por email.
+    // El teléfono ya no se solicita.
     @NotBlank @Email @Size(max = 50)
     private String email;
-
-    @NotBlank @Size(max = 15)
-    @Pattern(regexp = "^\\+[1-9][0-9]{10,13}$",
-            message = "Formato internacional: +573001234567")
-    private String phone;
-
-    @NotBlank
-    @Size(min = 8, max = 64)
-    @Pattern(regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).+$",
-            message = "La contraseña debe tener mayúscula, minúscula y número")
-    private String password;
 }

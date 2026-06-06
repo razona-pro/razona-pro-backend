@@ -20,11 +20,13 @@ public class StudentService {
 
     public PagedResponse<StudentDto> findAll(
             String search, String programId, String status, Pageable pageable) {
-        String q  = (search    != null && !search.isBlank())    ? search.trim()    : null;
-        String p  = (programId != null && !programId.isBlank()) ? programId.trim() : null;
-        String sf = (status    != null && !status.isBlank())    ? status.trim()    : "";
+        // Cadenas vacías (no null) para evitar parámetros de tipo indefinido en PostgreSQL
+        // (un null sin tipo se infiere como bytea y rompe LOWER(...)).
+        String q  = (search    != null) ? search.trim()    : "";
+        String p  = (programId != null) ? programId.trim() : "";
+        String sf = (status    != null) ? status.trim()    : "";
 
-        if (q == null && p == null && sf.isEmpty()) {
+        if (q.isEmpty() && p.isEmpty() && sf.isEmpty()) {
             return PagedResponse.from(studentRepository.findAll(pageable).map(StudentDto::from));
         }
         return PagedResponse.from(studentRepository.findByFilters(q, p, sf, pageable).map(StudentDto::from));
@@ -56,7 +58,14 @@ public class StudentService {
         if (StringUtils.hasText(req.getSecondName()))    s.setSecondName(req.getSecondName());
         if (StringUtils.hasText(req.getFirstSurname()))  s.setFirstSurname(req.getFirstSurname());
         if (StringUtils.hasText(req.getSecondSurname())) s.setSecondSurname(req.getSecondSurname());
-        if (StringUtils.hasText(req.getPhone()))         s.setPhone(req.getPhone());
+        if (StringUtils.hasText(req.getEmail())) {
+            String email = req.getEmail().trim().toLowerCase();
+            if (!email.equalsIgnoreCase(s.getEmail()) && studentRepository.existsByEmailIgnoreCase(email))
+                throw new com.razonapro.razonaprobackend.shared.exception.ApiException(
+                        com.razonapro.razonaprobackend.shared.exception.ErrorCode.EMAIL_ALREADY_EXISTS);
+            s.setEmail(email);
+        }
+        if (StringUtils.hasText(req.getPhone()))         s.setPhone(req.getPhone().trim());
         if (req.getIsActive() != null)                   s.setIsActive(req.getIsActive());
 
         return StudentDto.from(studentRepository.save(s));

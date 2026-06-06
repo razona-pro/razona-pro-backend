@@ -56,6 +56,7 @@ public class AiTriedService {
     private final AiTutor                   aiTutor;
     private final AiModelProperties         aiProps;
     private final ObjectMapper              mapper;
+    private final com.razonapro.razonaprobackend.domain.ranking.service.RankingService rankingService;
 
     // ── Consultas ──────────────────────────────────────────────────────
 
@@ -76,6 +77,12 @@ public class AiTriedService {
         return PagedResponse.from(aiTriedRepository
                 .findByStudentIdAndProgramId(studentId, programId, pageable)
                 .map(AiTriedDto::from));
+    }
+
+    /** Admin: historial de TODAS las sesiones IA; studentId es filtro opcional. */
+    public PagedResponse<AiTriedDto> findAllForAdmin(String studentId, Pageable pageable) {
+        String sid = (studentId == null || studentId.isBlank()) ? null : studentId.trim();
+        return PagedResponse.from(aiTriedRepository.findForAdmin(sid, pageable).map(AiTriedDto::from));
     }
 
     /** Admin: ve las preguntas que la IA generó en un intento (con la correcta revelada). */
@@ -298,7 +305,7 @@ public class AiTriedService {
         assertOwnership(at, p);
         if (!"IN_PROGRESS".equals(at.getStatus()))
             throw new ApiException(ErrorCode.TRIED_ALREADY_FINISHED);
-        if (timeSpentSeconds != null) at.setTimeSpentSeconds(timeSpentSeconds);
+        if (timeSpentSeconds != null && timeSpentSeconds > 0) at.setTimeSpentSeconds(timeSpentSeconds);
         List<AiQuestion> all = aiQuestionRepository.findByAiTriedIdOrderByQuestionOrderAsc(aiTriedId);
         finishAiTried(at, all);
         return AiTriedDto.from(aiTriedRepository.save(at));
@@ -347,30 +354,43 @@ public class AiTriedService {
                 .replace('―', '-');   // ― horizontal bar
     }
 
-    /** Score ponderado por el nivel de cada pregunta (justo) y normalizado a 0–100. */
+    /**
+     * Score ponderado por el nivel (1-10) de cada pregunta: puntos crudos (suma de los
+     * niveles de las correctas), misma lógica de incentivo que el simulacro estático.
+     * NO se normaliza a 100. Fuente de verdad única en Java (sin triggers de cálculo).
+     */
     private void finishAiTried(AiTried at, List<AiQuestion> questions) {
         at.setStatus("FINISHED");
         at.setFinishedAt(LocalDateTime.now());
 
-        int earned = 0, max = 0, correct = 0, answered = 0;
+        int earned = 0, correct = 0, answered = 0;
         for (AiQuestion q : questions) {
             int pts = q.getDifficultyLevel() != null ? q.getDifficultyLevel() : 5;
-            max += pts;
             if (q.getSelectedIndex() != null) answered++;
             if (Boolean.TRUE.equals(q.getIsCorrect())) { earned += pts; correct++; }
         }
         at.setCorrectAnswers(correct);
-        at.setScore(max > 0
-                ? BigDecimal.valueOf(earned)
-                .divide(BigDecimal.valueOf(max), 4, RoundingMode.HALF_UP)
-                .multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.HALF_UP)
-                : BigDecimal.ZERO);
+        at.setScore(BigDecimal.valueOf(earned).setScale(2, RoundingMode.HALF_UP));
 
         // IRT acumulativo: actualizar el theta del usuario en esta competencia
         double prior = loadPriorTheta(at.getProgramId(), at.getStudentId(), at.getCompetenceId());
         double finalTheta = computeTheta(questions, prior);
         at.setTheta(BigDecimal.valueOf(finalTheta).setScale(3, RoundingMode.HALF_UP));
         persistTheta(at, finalTheta, answered);
+
+        // Recalcular ranking tras el commit (sin bloquear la finalización si algo falla).
+        final String sid = at.getStudentId(), pid = at.getProgramId();
+        final java.time.LocalDateTime fin = at.getFinishedAt();
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                new org.springframework.transaction.support.TransactionSynchronization() {
+                    @Override public void afterCommit() {
+                        try { rankingService.refreshForStudent(sid, pid, fin); } catch (Exception ignored) {}
+                    }
+                });
+        } else {
+            try { rankingService.refreshForStudent(sid, pid, fin); } catch (Exception ignored) {}
+        }
     }
 
     /** Lee el theta acumulado del usuario en la competencia (0.0 si no existe). */

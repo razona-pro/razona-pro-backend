@@ -178,10 +178,23 @@ public class TestService {
         questionRepository.findById(new QuestionId(competenceId, questionId))
                 .orElseThrow(() -> new ResourceNotFoundException("Pregunta", questionId));
 
-        if (testQuestionRepository.existsByCompetenceIdAndTestIdAndQuestionId(competenceId, testId, questionId))
-            throw new ApiException(ErrorCode.DUPLICATE_RESOURCE, "La pregunta ya está asignada a este test");
-
         long order = testQuestionRepository.countByTestIdAndCompetenceId(testId, competenceId) + 1;
+
+        // Si ya existe una fila (la constraint UNIQUE es por question_id, no por estado):
+        //  - activa  → realmente está duplicada
+        //  - inactiva → se quitó antes; la REACTIVAMOS en vez de fallar
+        var existing = testQuestionRepository
+                .findByCompetenceIdAndTestIdAndQuestionId(competenceId, testId, questionId);
+        if (existing.isPresent()) {
+            TestQuestion tq = existing.get();
+            if (Boolean.TRUE.equals(tq.getIsActive()))
+                throw new ApiException(ErrorCode.DUPLICATE_RESOURCE, "La pregunta ya está asignada a este test");
+            tq.setIsActive(true);
+            tq.setQuestionOrder((int) order);
+            testQuestionRepository.save(tq);
+            return;
+        }
+
         testQuestionRepository.save(TestQuestion.builder()
                 .admin(adminRepository.findById(principal.getId()).orElseThrow())
                 .competenceId(competenceId).testId(testId).questionId(questionId)

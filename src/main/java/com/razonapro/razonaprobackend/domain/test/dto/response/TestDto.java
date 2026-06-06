@@ -19,6 +19,8 @@ public class TestDto {
     private Boolean isActive;
     /** Cantidad de preguntas por nivel: B=Básico, M=Medio, A=Alto */
     private Map<String, Long> difficultyBreakdown;
+    /** Total de preguntas ASIGNADAS al test (suma del breakdown). Si questionsToPresent es null = se presentan todas. */
+    private Long questionCount;
 
     public static TestDto from(Test t) {
         return TestDto.builder()
@@ -46,6 +48,8 @@ public class TestDto {
                 .testMode(t.getTestMode())
                 .isActive(t.getIsActive())
                 .difficultyBreakdown(difficultyBreakdown)
+                .questionCount(difficultyBreakdown == null ? null
+                        : difficultyBreakdown.values().stream().filter(java.util.Objects::nonNull).mapToLong(Long::longValue).sum())
                 .build();
     }
 }

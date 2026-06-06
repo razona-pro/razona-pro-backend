@@ -21,4 +21,8 @@ public interface RankingStudentRepository extends JpaRepository<RankingStudent, 
 
     boolean existsByRankingRankingIdAndStudentIdAndProgramId(
             String rankingId, String studentId, String programId);
+
+    /** Filas de un estudiante en un ranking (todos los períodos); el período se filtra en memoria. */
+    java.util.List<RankingStudent> findByRankingRankingIdAndStudentIdAndProgramId(
+            String rankingId, String studentId, String programId);
 }

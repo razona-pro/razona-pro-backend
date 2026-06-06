@@ -23,6 +23,7 @@ public class AdminService {
 
     private final AdminRepository adminRepository;
     private final PasswordEncoder passwordEncoder;
+    private final com.razonapro.razonaprobackend.infrastructure.email.EmailService emailService;
 
     public PagedResponse<AdminDto> findAll(String search, String status, Pageable pageable) {
         String q  = (search != null && !search.isBlank()) ? search.trim() : null;
@@ -45,10 +46,12 @@ public class AdminService {
 
     @Transactional
     public AdminDto create(AdminCreateRequest req) {
-        if (adminRepository.existsByEmail(req.getEmail().trim().toLowerCase()))
+        String email = req.getEmail().trim().toLowerCase();
+        if (adminRepository.existsByEmail(email))
             throw new ApiException(ErrorCode.EMAIL_ALREADY_EXISTS);
-        if (adminRepository.existsByPhone(req.getPhone().trim()))
-            throw new ApiException(ErrorCode.PHONE_ALREADY_EXISTS);
+
+        // La contraseña se genera y se envía por correo (no la digita el admin creador).
+        String rawPassword = generatePassword();
 
         Admin admin = Admin.builder()
                 .adminId(IdGenerator.adminId(adminRepository.count()))
@@ -56,11 +59,40 @@ public class AdminService {
                 .secondName(req.getSecondName())
                 .firstSurname(req.getFirstSurname())
                 .secondSurname(req.getSecondSurname())
-                .email(req.getEmail())
-                .phone(req.getPhone())
-                .passwordHash(passwordEncoder.encode(req.getPassword()))
+                .email(email)
+                .phone(null)   // el teléfono ya no se solicita
+                .passwordHash(passwordEncoder.encode(rawPassword))
                 .build();
-        return AdminDto.from(adminRepository.save(admin));
+        Admin saved = adminRepository.save(admin);
+
+        // Enviar credenciales por correo (best-effort: no rompe la creación si el correo falla).
+        try {
+            String name = (saved.getFirstName() + " " + saved.getFirstSurname()).trim();
+            emailService.sendAdminCredentialsEmail(saved.getEmail(), name, rawPassword);
+        } catch (Exception ignored) { /* el correo es @Async; cualquier fallo no debe romper la creación */ }
+
+        return AdminDto.from(saved);
+    }
+
+    /** Genera una contraseña segura con al menos 1 minúscula, 1 mayúscula y 1 dígito. */
+    private String generatePassword() {
+        final String lower = "abcdefghijkmnpqrstuvwxyz";
+        final String upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+        final String digit = "23456789";
+        final String all   = lower + upper + digit;
+        var rnd = new java.security.SecureRandom();
+        StringBuilder sb = new StringBuilder();
+        sb.append(lower.charAt(rnd.nextInt(lower.length())));
+        sb.append(upper.charAt(rnd.nextInt(upper.length())));
+        sb.append(digit.charAt(rnd.nextInt(digit.length())));
+        for (int i = 0; i < 9; i++) sb.append(all.charAt(rnd.nextInt(all.length())));
+        // Mezclar para que el orden no sea predecible
+        java.util.List<Character> chars = new java.util.ArrayList<>();
+        for (char c : sb.toString().toCharArray()) chars.add(c);
+        java.util.Collections.shuffle(chars, rnd);
+        StringBuilder out = new StringBuilder();
+        chars.forEach(out::append);
+        return out.toString();
     }
 
     @Transactional
@@ -72,7 +104,13 @@ public class AdminService {
         if (StringUtils.hasText(req.getSecondName()))    admin.setSecondName(req.getSecondName());
         if (StringUtils.hasText(req.getFirstSurname()))  admin.setFirstSurname(req.getFirstSurname());
         if (StringUtils.hasText(req.getSecondSurname())) admin.setSecondSurname(req.getSecondSurname());
-        if (StringUtils.hasText(req.getPhone()))         admin.setPhone(req.getPhone());
+        if (StringUtils.hasText(req.getEmail())) {
+            String email = req.getEmail().trim().toLowerCase();
+            if (!email.equals(admin.getEmail()) && adminRepository.existsByEmail(email))
+                throw new ApiException(ErrorCode.EMAIL_ALREADY_EXISTS);
+            admin.setEmail(email);
+        }
+        if (StringUtils.hasText(req.getPhone()))         admin.setPhone(req.getPhone().trim());
         if (req.getIsActive() != null)                   admin.setIsActive(req.getIsActive());
 
         return AdminDto.from(adminRepository.save(admin));

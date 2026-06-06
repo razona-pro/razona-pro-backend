@@ -47,11 +47,11 @@ public class StatsService {
         long finishedTrieds = triedRepository.countByStatus("FINISHED");
         long inProgressTrieds = triedRepository.countByStatus("IN_PROGRESS");
 
-        double avgScore = triedRepository.findStudentPerformanceSummary()
-                .stream()
-                .mapToDouble(r -> ((Number) r[2]).doubleValue())
-                .average()
-                .orElse(0.0);
+        // "Puntaje promedio" como % de aciertos global (correctas/total), no como puntos crudos.
+        var perf = triedRepository.findStudentPerformanceSummary();
+        long sumCorrect = perf.stream().mapToLong(r -> ((Number) r[3]).longValue()).sum();
+        long sumTotal   = perf.stream().mapToLong(r -> ((Number) r[4]).longValue()).sum();
+        double avgScore = sumTotal > 0 ? (sumCorrect * 100.0 / sumTotal) : 0.0;
 
         return AdminOverviewDto.builder()
                 .totalStudents(studentRepository.count())

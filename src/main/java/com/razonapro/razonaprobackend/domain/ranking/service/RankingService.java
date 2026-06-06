@@ -4,24 +4,96 @@ import com.razonapro.razonaprobackend.domain.ranking.dto.request.RankingRequest;
 import com.razonapro.razonaprobackend.domain.ranking.dto.response.RankingDto;
 import com.razonapro.razonaprobackend.domain.ranking.dto.response.RankingStudentDto;
 import com.razonapro.razonaprobackend.domain.ranking.model.Ranking;
+import com.razonapro.razonaprobackend.domain.ranking.model.RankingStudent;
 import com.razonapro.razonaprobackend.domain.ranking.repository.RankingRepository;
 import com.razonapro.razonaprobackend.domain.ranking.repository.RankingStudentRepository;
+import com.razonapro.razonaprobackend.domain.tried.repository.TriedRepository;
+import com.razonapro.razonaprobackend.domain.aitried.repository.AiTriedRepository;
 import com.razonapro.razonaprobackend.infrastructure.util.IdGenerator;
 import com.razonapro.razonaprobackend.shared.dto.PagedResponse;
 import com.razonapro.razonaprobackend.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class RankingService {
 
     private final RankingRepository        rankingRepository;
     private final RankingStudentRepository rankingStudentRepository;
+    private final TriedRepository          triedRepository;
+    private final AiTriedRepository        aiTriedRepository;
+
+    /**
+     * Recalcula los puntajes de un estudiante en todos los rankings activos.
+     * Reemplaza al trigger PL/pgSQL fn_refresh_student_ranking (eliminado para no acoplar
+     * la finalización de un intento a funciones de BD). Corre en transacción PROPIA
+     * (REQUIRES_NEW) y los llamadores lo envuelven en try/catch: si algo falla aquí,
+     * NUNCA debe impedir que un intento se finalice.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void refreshForStudent(String studentId, String programId, LocalDateTime finishedAt) {
+        LocalDateTime when = (finishedAt != null) ? finishedAt : LocalDateTime.now();
+
+        for (Ranking r : rankingRepository.findByIsActiveTrue()) {
+            LocalDate ps = null, pe = null;
+            switch (r.getPeriodType() == null ? "GENERAL" : r.getPeriodType()) {
+                case "DAILY"   -> { ps = when.toLocalDate(); pe = ps; }
+                case "WEEKLY"  -> { ps = when.toLocalDate().with(DayOfWeek.MONDAY); pe = ps.plusDays(6); }
+                case "MONTHLY" -> { ps = when.toLocalDate().withDayOfMonth(1); pe = ps.plusMonths(1).minusDays(1); }
+                default        -> { ps = null; pe = null; }   // GENERAL
+            }
+            LocalDateTime start = (ps != null) ? ps.atStartOfDay()        : null;
+            LocalDateTime end   = (pe != null) ? pe.atTime(23, 59, 59)    : null;
+            String src = r.getSourceFilter() == null ? "ALL" : r.getSourceFilter();
+
+            BigDecimal triedsScore = BigDecimal.ZERO; long triedsCount = 0;
+            if (src.equals("ALL") || src.equals("TRIEDS")) {
+                Object[] row = first(triedRepository.sumTriedsForRanking(studentId, programId, start, end));
+                if (row != null) { triedsScore = toBig(row[0]); triedsCount = toLong(row[1]); }
+            }
+            BigDecimal aiScore = BigDecimal.ZERO; long aiCount = 0;
+            if (src.equals("ALL") || src.equals("AI_TRIEDS")) {
+                Object[] row = first(aiTriedRepository.sumAiForRanking(studentId, programId, start, end));
+                if (row != null) { aiScore = toBig(row[0]); aiCount = toLong(row[1]); }
+            }
+
+            final LocalDate fps = ps, fpe = pe;
+            RankingStudent rs = rankingStudentRepository
+                    .findByRankingRankingIdAndStudentIdAndProgramId(r.getRankingId(), studentId, programId)
+                    .stream()
+                    .filter(x -> Objects.equals(x.getPeriodStart(), fps) && Objects.equals(x.getPeriodEnd(), fpe))
+                    .findFirst()
+                    .orElseGet(() -> RankingStudent.builder()
+                            .ranking(r).studentId(studentId).programId(programId)
+                            .periodStart(fps).periodEnd(fpe)
+                            .build());
+
+            rs.setTriedsScore(triedsScore);
+            rs.setAiTriedsScore(aiScore);
+            rs.setTriedsCount((int) triedsCount);
+            rs.setAiTriedsCount((int) aiCount);
+            rs.setTotalScore(triedsScore.add(aiScore));
+            rs.setLastActivityAt(LocalDateTime.now());
+            rankingStudentRepository.save(rs);
+        }
+    }
+
+    private static Object[] first(List<Object[]> rows) { return (rows == null || rows.isEmpty()) ? null : rows.get(0); }
+    private static BigDecimal toBig(Object o) { return (o instanceof Number n) ? new BigDecimal(n.toString()) : BigDecimal.ZERO; }
+    private static long toLong(Object o) { return (o instanceof Number n) ? n.longValue() : 0L; }
 
     public List<RankingDto> findAll() {
         return rankingRepository.findAll().stream().map(RankingDto::from).toList();

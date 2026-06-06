@@ -14,6 +14,7 @@ import com.razonapro.razonaprobackend.domain.tried.dto.request.SubmitAnswerReque
 import com.razonapro.razonaprobackend.domain.admin.repository.AdminRepository;
 import com.razonapro.razonaprobackend.domain.notification.service.NotificationService;
 import com.razonapro.razonaprobackend.domain.tried.dto.response.TriedDto;
+import com.razonapro.razonaprobackend.domain.tried.dto.response.TriedEligibilityDto;
 import com.razonapro.razonaprobackend.domain.tried.dto.response.TriedResumeDto;
 import com.razonapro.razonaprobackend.domain.tried.dto.response.TriedReviewDto;
 import com.razonapro.razonaprobackend.domain.tried.model.StudentResponse;
@@ -59,9 +60,11 @@ public class TriedService {
     private final StudentRepository         studentRepository;
     private final NotificationService       notificationService;
     private final AdminRepository           adminRepository;
+    private final com.razonapro.razonaprobackend.domain.ranking.service.RankingService rankingService;
 
     /** Nº de eventos sospechosos antes de anular el intento por fraude. */
-    private static final int FRAUD_LIMIT = 3;
+    /** Nº de eventos de plagio que se toleran. Al alcanzarlo se anula el intento Y se desactiva la cuenta. */
+    private static final int FRAUD_LIMIT = 2;
 
     // ── Consultas ────────────────────────────────────────────────────────
 
@@ -71,6 +74,14 @@ public class TriedService {
                 .findByStudentIdAndProgramId(principal.getId(), principal.getProgramId(), pageable)
                 .map(TriedDto::from);
         return PagedResponse.from(page);
+    }
+
+    /** Historial admin: todos los intentos (todos los estudiantes); studentId/status son filtros opcionales. */
+    @Transactional(readOnly = true)
+    public PagedResponse<TriedDto> findAllForAdmin(String studentId, String status, Pageable pageable) {
+        String sid = (studentId == null || studentId.isBlank()) ? null : studentId.trim();
+        String st  = (status    == null || status.isBlank())    ? null : status.trim();
+        return PagedResponse.from(triedRepository.findForAdmin(sid, st, pageable).map(TriedDto::from));
     }
 
     @Transactional(readOnly = true)
@@ -175,6 +186,42 @@ public class TriedService {
                 .finishedAt(tried.getFinishedAt())
                 .questions(questionReviews)
                 .build();
+    }
+
+    // ── Elegibilidad: ¿puede el estudiante entrar a esta prueba? ──────────
+
+    /**
+     * Determina si el estudiante puede entrar a una prueba. Si hay un intento activo
+     * (IN_PROGRESS) para esa prueba, se devuelve su id para REANUDARLO en vez de iniciar
+     * uno nuevo. Los intentos son ilimitados, así que haber finalizado antes no bloquea.
+     */
+    @Transactional(readOnly = true)
+    public TriedEligibilityDto checkEligibility(String testId, String competenceId, UserPrincipal principal) {
+        Test test = testRepository.findById(new TestPK(testId, competenceId)).orElse(null);
+        if (test == null)
+            return new TriedEligibilityDto(false, "La prueba no existe.", false, false, null);
+
+        boolean active = Boolean.TRUE.equals(test.getIsActive());
+        boolean hasQuestions = !testQuestionRepository
+                .findByTestIdAndCompetenceIdAndIsActiveTrue(testId, competenceId).isEmpty();
+
+        String inProgressTriedId = triedRepository
+                .findInProgressByStudent(principal.getId(), principal.getProgramId())
+                .stream()
+                .filter(t -> t.getTestId().equals(testId) && t.getCompetenceId().equals(competenceId))
+                .map(Tried::getTriedId)
+                .findFirst()
+                .orElse(null);
+
+        if (!active)
+            return new TriedEligibilityDto(false, "Esta prueba no está disponible en este momento.",
+                    false, hasQuestions, inProgressTriedId);
+        if (!hasQuestions)
+            return new TriedEligibilityDto(false, "Esta prueba aún no tiene preguntas asignadas.",
+                    true, false, inProgressTriedId);
+
+        // Activa y con preguntas: puede entrar (iniciar nuevo o reanudar el activo).
+        return new TriedEligibilityDto(true, null, true, true, inProgressTriedId);
     }
 
     // ── Iniciar intento ──────────────────────────────────────────────────
@@ -299,7 +346,8 @@ public class TriedService {
         if (!"IN_PROGRESS".equals(tried.getStatus()))
             throw new ApiException(ErrorCode.TRIED_ALREADY_FINISHED);
 
-        if (timeSpentSeconds != null) tried.setTimeSpentSeconds(timeSpentSeconds);
+        // El CHECK exige time_spent_seconds > 0; si llega 0/negativo lo dejamos en null.
+        if (timeSpentSeconds != null && timeSpentSeconds > 0) tried.setTimeSpentSeconds(timeSpentSeconds);
         finishTried(tried);
         return TriedDto.from(triedRepository.save(tried));
     }
@@ -383,9 +431,29 @@ public class TriedService {
             tried.setFinishedAt(LocalDateTime.now());
             createUnansweredResponses(tried);
             calculateScore(tried);
+            deactivateStudentForFraud(principal);
             notifyAdminsFraud(tried, principal);
+            notifyStudentDeactivated(principal);
         }
         return TriedDto.from(triedRepository.save(tried));
+    }
+
+    /** Desactiva la cuenta del estudiante por plagio: deberá enviar una apelación para reactivarla. */
+    private void deactivateStudentForFraud(UserPrincipal principal) {
+        studentRepository.findByStudentId(principal.getId()).ifPresent(s -> {
+            s.setIsActive(false);
+            studentRepository.save(s);
+        });
+    }
+
+    /** Notifica al estudiante que su cuenta fue desactivada y cómo apelar. */
+    private void notifyStudentDeactivated(UserPrincipal principal) {
+        notificationService.notify(
+                principal.getId(), "STUDENT", "ACCOUNT_DEACTIVATED",
+                "Cuenta desactivada por plagio",
+                "Tu cuenta fue desactivada tras detectar " + FRAUD_LIMIT + " eventos de plagio durante un examen. "
+                        + "Para solicitar su reactivación debes enviar una apelación a un administrador.",
+                "/dashboard/help");
     }
 
     private void notifyAdminsFraud(Tried tried, UserPrincipal principal) {
@@ -405,17 +473,36 @@ public class TriedService {
 
     // ── Helpers privados ─────────────────────────────────────────────────
 
+    /**
+     * Score ponderado por dificultad. Fuente de verdad única: los triggers de cálculo
+     * (trg_calculate_scores, trg_correct_answers) fueron eliminados, el cálculo vive aquí.
+     * Pesos: dificultad N/A (NULL) = 1, Básico (B) = 1, Medio (M) = 2, Alto (A) = 3.
+     * El score es la SUMA de pesos de las preguntas correctas (puntos crudos, NO sobre 100).
+     */
     private void calculateScore(Tried tried) {
         List<StudentResponse> responses = responseRepository
                 .findByTriedIdAndOptionIdIsNotNull(tried.getTriedId());
-        long correct = responses.stream().filter(r -> Boolean.TRUE.equals(r.getIsCorrect())).count();
-        tried.setCorrectAnswers((int) correct);
-        int total = tried.getTotalQuestions() != null ? tried.getTotalQuestions() : 0;
-        tried.setScore(total > 0
-                ? BigDecimal.valueOf(correct)
-                        .divide(BigDecimal.valueOf(total), 4, RoundingMode.HALF_UP)
-                        .multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.HALF_UP)
-                : BigDecimal.ZERO);
+        int earned = 0, correct = 0;
+        for (StudentResponse r : responses) {
+            if (!Boolean.TRUE.equals(r.getIsCorrect())) continue;
+            correct++;
+            earned += questionRepository
+                    .findByCompetenceIdAndQuestionId(tried.getCompetenceId(), r.getQuestionId())
+                    .map(q -> difficultyWeight(q.getDifficultyLevel()))
+                    .orElse(1);
+        }
+        tried.setCorrectAnswers(correct);
+        tried.setScore(BigDecimal.valueOf(earned).setScale(2, RoundingMode.HALF_UP));
+    }
+
+    /** Peso de dificultad para el puntaje: N/A o Básico = 1, Medio = 2, Alto = 3. */
+    static int difficultyWeight(String difficultyLevel) {
+        if (difficultyLevel == null) return 1;
+        return switch (difficultyLevel) {
+            case "M" -> 2;
+            case "A" -> 3;
+            default  -> 1;   // "B" o cualquier otro
+        };
     }
 
     private void createUnansweredResponses(Tried tried) {
@@ -447,6 +534,27 @@ public class TriedService {
         tried.setFinishedAt(LocalDateTime.now());
         createUnansweredResponses(tried);
         calculateScore(tried);
+        scheduleRankingRefresh(tried.getStudentId(), tried.getProgramId(), tried.getFinishedAt());
+    }
+
+    /**
+     * Recalcula el ranking del estudiante DESPUÉS de que la transacción del intento
+     * haga commit (así ve el intento ya FINISHED). Nunca bloquea la finalización:
+     * cualquier error de ranking se registra y se ignora.
+     */
+    private void scheduleRankingRefresh(String studentId, String programId, LocalDateTime finishedAt) {
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                new org.springframework.transaction.support.TransactionSynchronization() {
+                    @Override public void afterCommit() {
+                        try { rankingService.refreshForStudent(studentId, programId, finishedAt); }
+                        catch (Exception ignored) { /* el ranking nunca debe romper el flujo */ }
+                    }
+                });
+        } else {
+            try { rankingService.refreshForStudent(studentId, programId, finishedAt); }
+            catch (Exception ignored) { /* idem */ }
+        }
     }
 
     private void assertOwnership(Tried tried, UserPrincipal principal) {

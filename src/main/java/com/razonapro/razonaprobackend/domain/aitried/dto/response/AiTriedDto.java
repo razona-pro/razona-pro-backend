@@ -10,6 +10,9 @@ import java.time.LocalDateTime;
 @Getter @Builder
 public class AiTriedDto {
     private String aiTriedId;
+    private String studentId;
+    private String programId;
+    private String competenceId;
     private String status;
     private BigDecimal score;
     private Integer totalQuestions;
@@ -22,6 +25,9 @@ public class AiTriedDto {
     public static AiTriedDto from(AiTried a) {
         return AiTriedDto.builder()
                 .aiTriedId(a.getAiTriedId())
+                .studentId(a.getStudentId())
+                .programId(a.getProgramId())
+                .competenceId(a.getCompetenceId())
                 .status(a.getStatus())
                 .score(a.getScore())
                 .totalQuestions(a.getTotalQuestions())

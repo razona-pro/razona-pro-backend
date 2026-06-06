@@ -22,11 +22,43 @@ public interface TriedRepository extends JpaRepository<Tried, TriedId> {
     @Query("SELECT t FROM Tried t WHERE t.studentId = :studentId AND t.programId = :programId AND t.status = 'IN_PROGRESS'")
     List<Tried> findInProgressByStudent(String studentId, String programId);
 
+    /** Historial admin: todos los intentos, con filtros opcionales por estudiante y estado. */
+    @Query("""
+        SELECT t FROM Tried t
+        WHERE (:studentId IS NULL OR t.studentId = :studentId)
+          AND (:status    IS NULL OR t.status    = :status)
+    """)
+    Page<Tried> findForAdmin(@Param("studentId") String studentId,
+                             @Param("status") String status,
+                             Pageable pageable);
+
     long countByStatus(String status);
 
+    /** Suma de score y conteo para ranking: solo EXAM/TIMED FINISHED, en el período [start,end] (null = sin límite). */
+    @Query("""
+        SELECT COALESCE(SUM(t.score), 0), COUNT(t)
+        FROM Tried t, com.razonapro.razonaprobackend.domain.test.model.Test te
+        WHERE te.testId = t.testId AND te.competenceId = t.competenceId
+          AND t.studentId = :studentId AND t.programId = :programId
+          AND t.status = 'FINISHED' AND t.score IS NOT NULL
+          AND te.testMode IN ('EXAM','TIMED')
+          AND (:start IS NULL OR COALESCE(t.finishedAt, t.attemptTimestamp) >= :start)
+          AND (:end   IS NULL OR COALESCE(t.finishedAt, t.attemptTimestamp) <= :end)
+    """)
+    java.util.List<Object[]> sumTriedsForRanking(@Param("studentId") String studentId,
+                                                 @Param("programId") String programId,
+                                                 @Param("start") java.time.LocalDateTime start,
+                                                 @Param("end")   java.time.LocalDateTime end);
+
+    /**
+     * % de intentos "satisfactorios" = con al menos 60% de aciertos (correctas/total).
+     * Se basa en aciertos, NO en el score crudo (el score ahora son puntos ponderados, no /100).
+     */
     @Query("""
         SELECT COALESCE(
-          (SUM(CASE WHEN t.score >= 60 THEN 1.0 ELSE 0.0 END) / COUNT(t)) * 100,
+          (SUM(CASE WHEN t.totalQuestions > 0
+                      AND (COALESCE(t.correctAnswers, 0) * 100.0 / t.totalQuestions) >= 60
+                    THEN 1.0 ELSE 0.0 END) / COUNT(t)) * 100,
           0
         )
         FROM Tried t WHERE t.status = 'FINISHED'

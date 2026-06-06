@@ -30,9 +30,11 @@ public interface QuestionRepository extends JpaRepository<Question, QuestionId> 
      */
     @Query("""
         SELECT q FROM Question q
-        WHERE (:competenceId IS NULL OR q.competenceId = :competenceId)
-          AND (:difficulty   IS NULL OR q.difficultyLevel = :difficulty)
-          AND (:search IS NULL OR LOWER(q.statement) LIKE LOWER(CONCAT('%',:search,'%')))
+        WHERE (:competenceId = '' OR q.competenceId = :competenceId)
+          AND (:difficulty = ''
+               OR (:difficulty = 'NONE' AND q.difficultyLevel IS NULL)
+               OR q.difficultyLevel = :difficulty)
+          AND (:search = '' OR LOWER(q.statement) LIKE LOWER(CONCAT('%',:search,'%')))
           AND (:statusFilter = '' OR
                (:statusFilter = 'active'   AND q.isActive = true)  OR
                (:statusFilter = 'inactive' AND q.isActive = false))

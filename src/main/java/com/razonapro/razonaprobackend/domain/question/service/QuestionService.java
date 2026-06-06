@@ -48,12 +48,13 @@ public class QuestionService {
 
     public PagedResponse<QuestionDto> findByFilters(
             String competenceId, String difficulty, String status, String search, Pageable pageable) {
-        String comp = (competenceId != null && !competenceId.isBlank()) ? competenceId : null;
-        String diff = (difficulty   != null && !difficulty.isBlank())   ? difficulty   : null;
-        String srch = (search       != null && !search.isBlank())       ? search       : null;
-        String sf   = (status       != null && !status.isBlank())       ? status.trim(): "";
+        // Cadenas vacías (no null) para no romper PostgreSQL con parámetros sin tipo (bytea).
+        String comp = (competenceId != null) ? competenceId.trim() : "";
+        String diff = (difficulty   != null) ? difficulty.trim()   : "";  // 'NONE' = "No aplica" (dificultad NULL)
+        String srch = (search       != null) ? search.trim()       : "";
+        String sf   = (status       != null) ? status.trim()       : "";
 
-        if (comp == null && diff == null && srch == null && sf.isEmpty()) {
+        if (comp.isEmpty() && diff.isEmpty() && srch.isEmpty() && sf.isEmpty()) {
             return PagedResponse.from(questionRepository.findAll(pageable)
                     .map(q -> QuestionDto.from(q,
                             optionRepository.findByCompetenceIdAndQuestionId(q.getCompetenceId(), q.getQuestionId()))));

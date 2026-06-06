@@ -38,12 +38,12 @@ public interface StudentRepository extends JpaRepository<Student, StudentId> {
      */
     @Query("""
         SELECT s FROM Student s
-        WHERE (:search IS NULL OR
+        WHERE (:search = '' OR
                LOWER(s.studentId)    LIKE LOWER(CONCAT('%',:search,'%')) OR
                LOWER(s.firstName)    LIKE LOWER(CONCAT('%',:search,'%')) OR
                LOWER(s.firstSurname) LIKE LOWER(CONCAT('%',:search,'%')) OR
                LOWER(s.email)        LIKE LOWER(CONCAT('%',:search,'%')))
-          AND (:programId IS NULL OR LOWER(s.programId) = LOWER(:programId))
+          AND (:programId = '' OR LOWER(s.programId) = LOWER(:programId))
           AND (:statusFilter = '' OR
                (:statusFilter = 'active'   AND s.isActive      = true)  OR
                (:statusFilter = 'inactive' AND s.isActive      = false) OR

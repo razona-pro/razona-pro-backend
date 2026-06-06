@@ -16,6 +16,8 @@ import java.util.List;
 public class TriedDto {
 
     private String        triedId;
+    private String        studentId;
+    private String        programId;
     private String        testId;
     private String        testName;
     private String        competenceId;
@@ -32,6 +34,8 @@ public class TriedDto {
     public static TriedDto from(Tried t) {
         return TriedDto.builder()
                 .triedId(t.getTriedId())
+                .studentId(t.getStudentId())
+                .programId(t.getProgramId())
                 .testId(t.getTestId())
                 .testName(t.getTest() != null ? t.getTest().getTestName() : null)
                 .competenceId(t.getCompetenceId())
