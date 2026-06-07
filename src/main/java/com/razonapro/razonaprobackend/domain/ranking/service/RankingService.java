@@ -35,7 +35,7 @@ public class RankingService {
     private final RankingStudentRepository rankingStudentRepository;
     private final TriedRepository          triedRepository;
     private final AiTriedRepository        aiTriedRepository;
-    private final com.razonapro.razonaprobackend.domain.student.repository.StudentRepository studentRepository;
+    private final com.razonapro.razonaprobackend.domain.program.repository.ProgramRepository programRepository;
 
     /**
      * Recalcula los puntajes de un estudiante en todos los rankings activos.
@@ -120,30 +120,6 @@ public class RankingService {
         }
     }
 
-    /**
-     * Recalcula TODOS los rankings para TODOS los estudiantes. Herramienta de reparación
-     * del admin: repuebla las tablas de posiciones a partir de los intentos ya existentes
-     * (útil tras crear un ranking nuevo o si quedó algo desincronizado). A diferencia del
-     * refresco automático, aquí los errores SÍ se propagan para que el admin los vea.
-     *
-     * @return nº de estudiantes procesados.
-     */
-    @Transactional
-    public int recomputeAll() {
-        var students = studentRepository.findAll();
-        LocalDateTime now = LocalDateTime.now();
-        int processed = 0;
-        for (var s : students) {
-            for (Ranking r : rankingRepository.findByIsActiveTrue()) {
-                refreshOne(r, s.getStudentId(), s.getProgramId(), now);
-            }
-            processed++;
-        }
-        log.info("recomputeAll: {} estudiantes recalculados en {} ranking(s) activos",
-                processed, rankingRepository.findByIsActiveTrue().size());
-        return processed;
-    }
-
     private static Object[] first(List<Object[]> rows) { return (rows == null || rows.isEmpty()) ? null : rows.get(0); }
     private static BigDecimal toBig(Object o) { return (o instanceof Number n) ? new BigDecimal(n.toString()) : BigDecimal.ZERO; }
     private static long toLong(Object o) { return (o instanceof Number n) ? n.longValue() : 0L; }
@@ -159,8 +135,12 @@ public class RankingService {
     public PagedResponse<RankingStudentDto> getLeaderboard(String rankingId, Pageable pageable) {
         rankingRepository.findById(rankingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Ranking", rankingId));
+        // Mapa programId -> nombre (pocos programas) para mostrar el nombre, no el código.
+        java.util.Map<String, String> programNames = new java.util.HashMap<>();
+        programRepository.findAll().forEach(p -> programNames.put(p.getProgramId(), p.getProgramName()));
         return PagedResponse.from(
-                rankingStudentRepository.findLeaderboard(rankingId, pageable).map(RankingStudentDto::from));
+                rankingStudentRepository.findLeaderboard(rankingId, pageable)
+                        .map(rs -> RankingStudentDto.from(rs, programNames.get(rs.getProgramId()))));
     }
 
     @Transactional

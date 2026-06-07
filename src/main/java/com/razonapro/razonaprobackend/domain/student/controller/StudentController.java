@@ -38,6 +38,16 @@ public class StudentController {
         return ResponseEntity.ok(ApiResponse.ok(studentService.findById(principal.getId())));
     }
 
+    @PutMapping("/me")
+    @PreAuthorize("hasRole('STUDENT')")
+    @Operation(summary = "El estudiante edita su propio perfil (nombres y celular)")
+    public ResponseEntity<ApiResponse<StudentDto>> updateMe(
+            @Valid @RequestBody StudentUpdateRequest req,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                studentService.updateOwnProfile(principal.getId(), req)));
+    }
+
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Listar estudiantes con filtros opcionales (Admin)")

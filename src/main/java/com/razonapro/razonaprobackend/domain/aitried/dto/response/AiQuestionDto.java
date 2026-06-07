@@ -14,7 +14,8 @@ public record AiQuestionDto(
         Integer selectedIndex,   // null si no respondida
         Boolean isCorrect,       // null si no respondida
         Integer correctIndex,    // null si no revelada (solo admin/review)
-        String explanation       // null si no revelada (solo admin/review)
+        String explanation,      // null si no revelada (solo admin/review)
+        String competenceId      // competencia de esta pregunta (multi-competencia)
 ) {
     public record OptionDto(String id, String text) {}
 }

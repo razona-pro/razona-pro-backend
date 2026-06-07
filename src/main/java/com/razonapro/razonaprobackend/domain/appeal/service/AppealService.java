@@ -7,6 +7,7 @@ import com.razonapro.razonaprobackend.domain.appeal.repository.AppealRepository;
 import com.razonapro.razonaprobackend.domain.notification.service.NotificationService;
 import com.razonapro.razonaprobackend.domain.student.model.Student;
 import com.razonapro.razonaprobackend.domain.student.repository.StudentRepository;
+import com.razonapro.razonaprobackend.infrastructure.email.EmailService;
 import com.razonapro.razonaprobackend.infrastructure.util.IdGenerator;
 import com.razonapro.razonaprobackend.shared.dto.PagedResponse;
 import com.razonapro.razonaprobackend.shared.exception.ApiException;
@@ -34,6 +35,7 @@ public class AppealService {
     private final StudentRepository   studentRepository;
     private final AdminRepository     adminRepository;
     private final NotificationService notificationService;
+    private final EmailService        emailService;
     private final PasswordEncoder     passwordEncoder;
 
     // ── Estado de cuenta (público, re-valida credenciales) ───────────────
@@ -82,7 +84,7 @@ public class AppealService {
                 .status(STATUS_PENDING)
                 .build());
 
-        notifyAdminsNewAppeal(s);
+        notifyAdminsNewAppeal(s, appeal.getMessage());
         log.info("Appeal submitted by {}/{}", s.getProgramId(), s.getStudentId());
         return AppealDto.from(appeal, fullName(s));
     }
@@ -121,6 +123,12 @@ public class AppealService {
             s.setIsActive(true);
             s.setDeactivationReason(null);
             studentRepository.save(s);
+        }
+
+        // Correo al estudiante con el resultado (best-effort, async).
+        if (s != null) {
+            try { emailService.sendAppealResolvedEmail(s.getEmail(), s.getFirstName(), approve, appeal.getAdminResponse()); }
+            catch (Exception ignored) { /* correo no crítico */ }
         }
 
         // Notificación best-effort (corre en tx propia; no rompe la resolución).
@@ -165,17 +173,24 @@ public class AppealService {
         return s;
     }
 
-    private void notifyAdminsNewAppeal(Student s) {
+    private void notifyAdminsNewAppeal(Student s, String message) {
         String name = fullName(s);
+        String reason = s.getDeactivationReason() == null ? "MANUAL" : s.getDeactivationReason();
         adminRepository.findAll().stream()
                 .filter(a -> Boolean.TRUE.equals(a.getIsActive()))
                 .forEach(a -> {
+                    // Notificación in-app (best-effort).
                     try {
                         notificationService.notify(a.getAdminId(), "ADMIN", "APPEAL_NEW",
                                 "Nueva apelación de estudiante",
                                 "El estudiante " + name + " (" + s.getStudentId() + ") envió una apelación de reactivación.",
                                 "/admin/appeals");
                     } catch (Exception ignored) { /* notificación no crítica */ }
+                    // Correo (best-effort, async).
+                    try {
+                        emailService.sendAppealReceivedAdminEmail(
+                                a.getEmail(), a.getFirstName(), name, s.getStudentId(), reason, message);
+                    } catch (Exception ignored) { /* correo no crítico */ }
                 });
     }
 

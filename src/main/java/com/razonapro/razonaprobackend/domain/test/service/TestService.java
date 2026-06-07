@@ -57,9 +57,14 @@ public class TestService {
 
     private Map<String, Long> getDifficultyBreakdown(String testId) {
         // Test-wide: la prueba puede tener preguntas de varias competencias.
+        // La dificultad NULL ("no aplica") se mapea a la clave "NA": Jackson no permite
+        // claves null en un Map y reventaba la serialización al listar pruebas.
         Map<String, Long> breakdown = new HashMap<>();
         testQuestionRepository.countByDifficultyTestWide(testId)
-                .forEach(r -> breakdown.put((String) r[0], (Long) r[1]));
+                .forEach(r -> {
+                    String key = (r[0] == null) ? "NA" : (String) r[0];
+                    breakdown.merge(key, (Long) r[1], Long::sum);
+                });
         return breakdown;
     }
 
@@ -127,11 +132,14 @@ public class TestService {
                     "Ya existe una prueba con el nombre \"" + req.getTestName() + "\".");
         }
 
-        // EXAM y TIMED requieren tiempo; PRACTICE puede ser sin tiempo (null)
-        if (!"PRACTICE".equals(req.getTestMode()) && req.getDurationSeconds() == null) {
+        // Solo EXAM requiere una duración total. PRACTICE no tiene tiempo.
+        // TIMED: el tiempo es POR PREGUNTA (calculado según la dificultad en el front),
+        // así que su duración total se ignora (null).
+        if ("EXAM".equals(req.getTestMode()) && req.getDurationSeconds() == null) {
             throw new ApiException(ErrorCode.INVALID_INPUT,
-                    "Los modos EXAM y TIMED requieren una duración.");
+                    "El modo Examen requiere una duración total.");
         }
+        Integer duration = "TIMED".equals(req.getTestMode()) ? null : req.getDurationSeconds();
 
         Test test = Test.builder()
                 .testId(IdGenerator.testId(testRepository.count()))
@@ -139,7 +147,7 @@ public class TestService {
                         .orElseThrow(() -> new ResourceNotFoundException("Admin", principal.getId())))
                 .testName(req.getTestName())
                 .description(req.getDescription())
-                .durationSeconds(req.getDurationSeconds())
+                .durationSeconds(duration)
                 .questionsToPresent(req.getQuestionsToPresent())
                 .testMode(req.getTestMode())
                 .build();

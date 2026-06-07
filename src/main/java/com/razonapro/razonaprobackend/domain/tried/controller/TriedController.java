@@ -7,7 +7,6 @@ import com.razonapro.razonaprobackend.domain.tried.dto.response.TriedEligibility
 import com.razonapro.razonaprobackend.domain.tried.dto.response.TriedResumeDto;
 import com.razonapro.razonaprobackend.domain.tried.dto.response.TriedReviewDto;
 import com.razonapro.razonaprobackend.domain.tried.service.TriedService;
-import com.razonapro.razonaprobackend.domain.ranking.service.RankingService;
 import com.razonapro.razonaprobackend.infrastructure.security.UserPrincipal;
 import com.razonapro.razonaprobackend.shared.dto.ApiResponse;
 import com.razonapro.razonaprobackend.shared.dto.PagedResponse;
@@ -32,7 +31,6 @@ import org.springframework.web.bind.annotation.*;
 public class TriedController {
 
     private final TriedService triedService;
-    private final RankingService rankingService;
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
@@ -140,9 +138,7 @@ public class TriedController {
             @RequestParam(required = false) Integer timeSpentSeconds,
             @AuthenticationPrincipal UserPrincipal principal) {
         TriedDto dto = triedService.finishManually(triedId, timeSpentSeconds, principal);
-        // Ranking best-effort: ya está finalizado; si el refresco falla, no afecta la respuesta.
-        try { rankingService.refreshForStudent(principal.getId(), principal.getProgramId(), null); }
-        catch (Exception e) { log.warn("No se pudo refrescar el ranking de {}: {}", principal.getId(), e.getMessage()); }
+        // El ranking se actualiza por trigger al pasar el intento a FINISHED.
         return ResponseEntity.ok(ApiResponse.ok("Intento finalizado", dto));
     }
 }

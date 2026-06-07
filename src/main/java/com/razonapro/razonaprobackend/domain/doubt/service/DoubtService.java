@@ -1,6 +1,8 @@
 // domain/doubt/service/DoubtService.java
 package com.razonapro.razonaprobackend.domain.doubt.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import com.razonapro.razonaprobackend.domain.admin.repository.AdminRepository;
 import com.razonapro.razonaprobackend.domain.aitried.repository.AiQuestionRepository;
 import com.razonapro.razonaprobackend.domain.doubt.dto.DoubtDto;
@@ -35,6 +37,7 @@ public class DoubtService {
     private final AiQuestionRepository    aiQuestionRepository;
     private final AdminRepository         adminRepository;
     private final NotificationService     notificationService;
+    private final ObjectMapper            mapper;
 
     @Transactional
     public DoubtDto report(DoubtRequest req, UserPrincipal p) {
@@ -91,6 +94,25 @@ public class DoubtService {
         if ("STATIC".equals(d.getSource()) && d.getCompetenceId() != null && d.getQuestionId() != null) {
             return optionRepository.findByCompetenceIdAndQuestionId(d.getCompetenceId(), d.getQuestionId())
                     .stream().map(OptionDto::from).toList();
+        }
+        // IA: las opciones (y la correcta) viven en el JSON de la ai_question.
+        if ("AI".equals(d.getSource()) && d.getAiQuestionId() != null) {
+            return aiQuestionRepository.findById(d.getAiQuestionId()).map(aq -> {
+                try {
+                    var opts = mapper.readValue(aq.getOptionsJson(),
+                            new com.fasterxml.jackson.core.type.TypeReference<
+                                java.util.List<com.razonapro.razonaprobackend.domain.aitried.port.dto.AiOption>>() {});
+                    java.util.List<OptionDto> out = new java.util.ArrayList<>();
+                    for (int i = 0; i < opts.size(); i++) {
+                        out.add(OptionDto.builder()
+                                .optionId("OPT" + i)
+                                .optionText(opts.get(i).text())
+                                .isCorrect(i == aq.getCorrectIndex())
+                                .build());
+                    }
+                    return out;
+                } catch (Exception e) { return null; }
+            }).orElse(null);
         }
         return null;
     }

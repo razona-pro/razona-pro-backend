@@ -1,5 +1,6 @@
 package com.razonapro.razonaprobackend.domain.auth.controller;
 
+import com.razonapro.razonaprobackend.domain.auth.dto.request.ChangePasswordRequest;
 import com.razonapro.razonaprobackend.domain.auth.dto.request.ResendVerificationRequest;
 import com.razonapro.razonaprobackend.domain.auth.dto.request.ResetPasswordRequest;
 import com.razonapro.razonaprobackend.domain.auth.dto.request.StudentRegisterRequest;
@@ -69,6 +70,29 @@ public class AuthController {
     @Operation(summary = "Aplicar nueva contraseña usando el token recibido por correo")
     public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody ResetPasswordRequest req) {
         authService.resetPassword(req);
+        return ResponseEntity.ok(ApiResponse.ok("Contraseña actualizada exitosamente."));
+    }
+
+    // ── Cambio de contraseña autenticado (con código al correo) ──────────
+
+    @PostMapping("/change-password/request-code")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN','STUDENT')")
+    @Operation(summary = "Envía un código al correo del usuario para autorizar el cambio de contraseña")
+    public ResponseEntity<ApiResponse<Void>> requestChangeCode(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal
+            com.razonapro.razonaprobackend.infrastructure.security.UserPrincipal principal) {
+        authService.requestPasswordChangeCode(principal);
+        return ResponseEntity.ok(ApiResponse.ok("Te enviamos un código de verificación a tu correo."));
+    }
+
+    @PostMapping("/change-password")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN','STUDENT')")
+    @Operation(summary = "Cambia la contraseña validando el código y la contraseña actual")
+    public ResponseEntity<ApiResponse<Void>> changePassword(
+            @Valid @RequestBody ChangePasswordRequest req,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal
+            com.razonapro.razonaprobackend.infrastructure.security.UserPrincipal principal) {
+        authService.changePassword(principal, req);
         return ResponseEntity.ok(ApiResponse.ok("Contraseña actualizada exitosamente."));
     }
 }

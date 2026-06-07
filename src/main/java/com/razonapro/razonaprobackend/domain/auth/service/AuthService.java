@@ -404,6 +404,65 @@ public class AuthService {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
+    //  CAMBIO DE CONTRASEÑA AUTENTICADO (con código al correo)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /** Código de verificación de cambio de contraseña, en memoria (clave = userType:userId). */
+    private record PwCode(String code, java.time.LocalDateTime expiresAt) {}
+    private final java.util.Map<String, PwCode> pwCodes = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final long PW_CODE_TTL_MIN = 10;
+
+    /** Envía un código de 6 dígitos al correo del usuario autenticado para autorizar el cambio. */
+    @Transactional(readOnly = true)
+    public void requestPasswordChangeCode(com.razonapro.razonaprobackend.infrastructure.security.UserPrincipal p) {
+        String email; String name;
+        if ("ADMIN".equals(p.getUserType())) {
+            Admin a = adminRepository.findById(p.getId())
+                    .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
+            email = a.getEmail(); name = a.getFirstName();
+        } else {
+            Student s = studentRepository.findByStudentId(p.getId())
+                    .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
+            email = s.getEmail(); name = s.getFirstName();
+        }
+        String code = String.format("%06d", new java.security.SecureRandom().nextInt(1_000_000));
+        pwCodes.put(p.getUserType() + ":" + p.getId(),
+                new PwCode(code, LocalDateTime.now().plusMinutes(PW_CODE_TTL_MIN)));
+        emailService.sendVerificationCodeEmail(email, name, code);
+        log.info("requestPasswordChangeCode - código enviado a {} ({})", email, p.getUserType());
+    }
+
+    /** Cambia la contraseña validando el código enviado al correo y la contraseña actual. */
+    @Transactional
+    public void changePassword(com.razonapro.razonaprobackend.infrastructure.security.UserPrincipal p,
+                               ChangePasswordRequest req) {
+        String key = p.getUserType() + ":" + p.getId();
+        PwCode pc = pwCodes.get(key);
+        if (pc == null || pc.expiresAt().isBefore(LocalDateTime.now()))
+            throw new ApiException(ErrorCode.TOKEN_INVALID, "El código es inválido o expiró. Solicita uno nuevo.");
+        if (!pc.code().equals(req.getCode().trim()))
+            throw new ApiException(ErrorCode.TOKEN_INVALID, "El código de verificación no coincide.");
+
+        if ("ADMIN".equals(p.getUserType())) {
+            Admin a = adminRepository.findById(p.getId())
+                    .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
+            if (!passwordEncoder.matches(req.getCurrentPassword(), a.getPasswordHash()))
+                throw new ApiException(ErrorCode.INVALID_CREDENTIALS, "La contraseña actual no es correcta.");
+            a.setPasswordHash(passwordEncoder.encode(req.getNewPassword()));
+            adminRepository.save(a);
+        } else {
+            Student s = studentRepository.findByStudentId(p.getId())
+                    .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
+            if (!passwordEncoder.matches(req.getCurrentPassword(), s.getPasswordHash()))
+                throw new ApiException(ErrorCode.INVALID_CREDENTIALS, "La contraseña actual no es correcta.");
+            s.setPasswordHash(passwordEncoder.encode(req.getNewPassword()));
+            studentRepository.save(s);
+        }
+        pwCodes.remove(key);
+        log.info("changePassword - contraseña actualizada para {} ({})", p.getId(), p.getUserType());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
     //  HELPERS PRIVADOS
     // ═══════════════════════════════════════════════════════════════════════
 

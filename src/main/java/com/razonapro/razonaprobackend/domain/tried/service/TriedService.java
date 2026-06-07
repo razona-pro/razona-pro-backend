@@ -63,7 +63,7 @@ public class TriedService {
     private final StudentRepository         studentRepository;
     private final NotificationService       notificationService;
     private final AdminRepository           adminRepository;
-    private final com.razonapro.razonaprobackend.domain.ranking.service.RankingService rankingService;
+    private final com.razonapro.razonaprobackend.infrastructure.email.EmailService emailService;
 
     /** Nº de eventos sospechosos antes de anular el intento por fraude. */
     /** Nº de eventos de plagio que se toleran. Al alcanzarlo se anula el intento Y se desactiva la cuenta. */
@@ -126,23 +126,34 @@ public class TriedService {
                         }
                 ));
 
-        // Cargar las preguntas asignadas al test (todas las competencias de la prueba)
-        List<TestQuestion> testQuestions = testQuestionRepository
-                .findByTestIdAndIsActiveTrue(tried.getTestId());
+        // Preguntas DEL INTENTO: se reconstruyen desde las respuestas del estudiante
+        // (refleja exactamente lo presentado y es robusto si la prueba cambió después).
+        // Si no hubiera respuestas, se cae a las preguntas asignadas al test.
+        java.util.LinkedHashMap<String, String[]> presented = new java.util.LinkedHashMap<>();
+        for (StudentResponse r : responses) {
+            presented.putIfAbsent(r.getCompetenceId() + ":" + r.getQuestionId(),
+                    new String[]{ r.getCompetenceId(), r.getQuestionId() });
+        }
+        if (presented.isEmpty()) {
+            for (TestQuestion tq : testQuestionRepository.findByTestIdAndIsActiveTrue(tried.getTestId())) {
+                presented.putIfAbsent(tq.getCompetenceId() + ":" + tq.getQuestionId(),
+                        new String[]{ tq.getCompetenceId(), tq.getQuestionId() });
+            }
+        }
 
         List<TriedReviewDto.QuestionReview> questionReviews = new ArrayList<>();
 
-        for (TestQuestion tq : testQuestions) {
+        for (String[] pair : presented.values()) {
+            String compId = pair[0], qId = pair[1];
             Question question = questionRepository
-                    .findById(new QuestionId(tq.getCompetenceId(), tq.getQuestionId()))
+                    .findById(new QuestionId(compId, qId))
                     .orElse(null);
             if (question == null) continue;
 
-            List<Option> options = optionRepository.findByCompetenceIdAndQuestionId(
-                    tq.getCompetenceId(), tq.getQuestionId());
+            List<Option> options = optionRepository.findByCompetenceIdAndQuestionId(compId, qId);
 
             StudentResponse studentResp =
-                    responseByQuestion.get(tq.getQuestionId());
+                    responseByQuestion.get(qId);
             String selectedOptionId = (studentResp != null) ? studentResp.getOptionId() : null;
 
             String correctOptionId = options.stream()
@@ -164,7 +175,7 @@ public class TriedService {
 
             questionReviews.add(TriedReviewDto.QuestionReview.builder()
                     .questionId(question.getQuestionId())
-                    .competenceId(tq.getCompetenceId())
+                    .competenceId(compId)
                     .statement(question.getStatement())
                     .explanation(question.getExplanation())
                     .source(question.getSource())
@@ -361,6 +372,8 @@ public class TriedService {
             sr.setAnsweredAt(LocalDateTime.now());
             responseRepository.save(sr);
         } else {
+            // created_at = answered_at (mismo instante) para no violar el CHECK answered_at >= created_at.
+            LocalDateTime nowTs = LocalDateTime.now();
             responseRepository.save(StudentResponse.builder()
                     .studentResponseId(IdGenerator.studentResponseId(responseRepository.count()))
                     .competenceId(qComp)
@@ -371,7 +384,8 @@ public class TriedService {
                     .questionId(req.getQuestionId())
                     .optionId(req.getOptionId())
                     .isCorrect(selectedOption.getIsCorrect())
-                    .answeredAt(LocalDateTime.now())
+                    .createdAt(nowTs)
+                    .answeredAt(nowTs)
                     .build());
         }
 
@@ -478,8 +492,9 @@ public class TriedService {
             //    y desactivar la cuenta del estudiante. Se guardan primero.
             tried.setStatus("PLAGIO");
             tried.setFinishedAt(LocalDateTime.now());
-            createUnansweredResponses(tried);
-            calculateScore(tried);
+            // Plagio = intento ANULADO: no cuenta lo respondido, puntaje 0.
+            tried.setScore(java.math.BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+            tried.setCorrectAnswers(0);
             triedRepository.save(tried);
             deactivateStudentForFraud(principal);
 
@@ -517,14 +532,21 @@ public class TriedService {
                 .map(s -> (s.getFirstName() + " " + s.getFirstSurname()).trim())
                 .orElse(principal.getId());
         String testName = (tried.getTest() != null) ? tried.getTest().getTestName() : tried.getTestId();
+        final String sName = studentName, sId = principal.getId(), tName = testName;
         adminRepository.findAll().stream()
                 .filter(a -> Boolean.TRUE.equals(a.getIsActive()))
-                .forEach(a -> notificationService.notify(
-                        a.getAdminId(), "ADMIN", "FRAUD_ALERT",
-                        "Intento anulado por fraude",
-                        "El estudiante " + studentName + " (" + principal.getId() + ") fue anulado por fraude en el test \""
-                                + testName + "\" tras " + tried.getFraudAttempts() + " eventos sospechosos.",
-                        "/admin/students"));
+                .forEach(a -> {
+                    try {
+                        notificationService.notify(
+                            a.getAdminId(), "ADMIN", "FRAUD_ALERT",
+                            "Intento anulado por plagio",
+                            "El estudiante " + sName + " (" + sId + ") fue anulado por plagio en el test \""
+                                    + tName + "\" tras " + tried.getFraudAttempts() + " eventos sospechosos.",
+                            "/admin/appeals");
+                    } catch (Exception ignored) { /* notificación no crítica */ }
+                    try { emailService.sendFraudAdminEmail(a.getEmail(), a.getFirstName(), sName, sId, tName); }
+                    catch (Exception ignored) { /* correo no crítico */ }
+                });
     }
 
     // ── Helpers privados ─────────────────────────────────────────────────
@@ -592,29 +614,8 @@ public class TriedService {
         tried.setFinishedAt(LocalDateTime.now());
         createUnansweredResponses(tried);
         calculateScore(tried);
-        scheduleRankingRefresh(tried.getStudentId(), tried.getProgramId(), tried.getFinishedAt());
-    }
-
-    /**
-     * Recalcula el ranking del estudiante DESPUÉS de que la transacción del intento
-     * haga commit (así ve el intento ya FINISHED). Nunca bloquea la finalización:
-     * cualquier error de ranking se registra y se ignora.
-     */
-    private void scheduleRankingRefresh(String studentId, String programId, LocalDateTime finishedAt) {
-        if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
-            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
-                new org.springframework.transaction.support.TransactionSynchronization() {
-                    @Override public void afterCommit() {
-                        try { rankingService.refreshForStudent(studentId, programId, finishedAt); }
-                        catch (Exception e) { log.error("Ranking refresh (afterCommit) falló para {}/{}: {}",
-                                programId, studentId, e.getMessage(), e); }
-                    }
-                });
-        } else {
-            try { rankingService.refreshForStudent(studentId, programId, finishedAt); }
-            catch (Exception e) { log.error("Ranking refresh falló para {}/{}: {}",
-                    programId, studentId, e.getMessage(), e); }
-        }
+        // Los rankings se actualizan automáticamente por el trigger trg_update_ranking_on_tried
+        // cuando el intento pasa a FINISHED (no se recalcula desde Java).
     }
 
     private void assertOwnership(Tried tried, UserPrincipal principal) {

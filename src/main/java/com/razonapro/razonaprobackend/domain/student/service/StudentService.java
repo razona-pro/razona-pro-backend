@@ -76,6 +76,26 @@ public class StudentService {
         return StudentDto.from(studentRepository.save(s));
     }
 
+    /** Auto-edición del estudiante: solo nombres y celular (NO email, NO estado). */
+    @Transactional
+    public StudentDto updateOwnProfile(String studentId, StudentUpdateRequest req) {
+        Student s = studentRepository.findByStudentId(studentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Estudiante", studentId));
+
+        if (StringUtils.hasText(req.getFirstName()))     s.setFirstName(req.getFirstName().trim());
+        if (req.getSecondName() != null)                 s.setSecondName(req.getSecondName().isBlank() ? null : req.getSecondName().trim());
+        if (StringUtils.hasText(req.getFirstSurname()))  s.setFirstSurname(req.getFirstSurname().trim());
+        if (req.getSecondSurname() != null)              s.setSecondSurname(req.getSecondSurname().isBlank() ? null : req.getSecondSurname().trim());
+        if (StringUtils.hasText(req.getPhone())) {
+            String phone = req.getPhone().trim();
+            if (!phone.equals(s.getPhone()) && studentRepository.existsByPhone(phone))
+                throw new com.razonapro.razonaprobackend.shared.exception.ApiException(
+                        com.razonapro.razonaprobackend.shared.exception.ErrorCode.PHONE_ALREADY_EXISTS);
+            s.setPhone(phone);
+        }
+        return StudentDto.from(studentRepository.save(s));
+    }
+
     @Transactional
     public void deactivate(String studentId) {
         Student s = studentRepository.findByStudentId(studentId)

@@ -5,7 +5,6 @@ import com.razonapro.razonaprobackend.domain.aitried.dto.request.StartAiTriedReq
 import com.razonapro.razonaprobackend.domain.aitried.dto.request.SubmitAiAnswerRequest;
 import com.razonapro.razonaprobackend.domain.aitried.dto.response.*;
 import com.razonapro.razonaprobackend.domain.aitried.service.AiTriedService;
-import com.razonapro.razonaprobackend.domain.ranking.service.RankingService;
 import com.razonapro.razonaprobackend.infrastructure.security.UserPrincipal;
 import com.razonapro.razonaprobackend.shared.dto.ApiResponse;
 import com.razonapro.razonaprobackend.shared.dto.PagedResponse;
@@ -33,13 +32,6 @@ import java.util.List;
 public class AiTriedController {
 
     private final AiTriedService service;
-    private final RankingService rankingService;
-
-    /** Refresca el ranking sin afectar la respuesta: si falla, solo se loguea. */
-    private void refreshRanking(UserPrincipal p) {
-        try { rankingService.refreshForStudent(p.getId(), p.getProgramId(), null); }
-        catch (Exception e) { log.warn("No se pudo refrescar el ranking de {}: {}", p.getId(), e.getMessage()); }
-    }
 
     @GetMapping("/status")
     public ResponseEntity<ApiResponse<AiStatusDto>> status() {
@@ -129,7 +121,6 @@ public class AiTriedController {
             @PathVariable String aiTriedId, @Valid @RequestBody SubmitAiAnswerRequest req,
             @AuthenticationPrincipal UserPrincipal p) {
         AiAnswerResultDto result = service.submitAnswer(aiTriedId, req, p);
-        if (result.finished()) refreshRanking(p);   // ya comprometido; refresco best-effort
         return ResponseEntity.ok(ApiResponse.ok(result));
     }
 
@@ -148,7 +139,6 @@ public class AiTriedController {
             @RequestParam(required = false) Integer timeSpentSeconds,
             @AuthenticationPrincipal UserPrincipal p) {
         AiTriedDto dto = service.finish(aiTriedId, timeSpentSeconds, p);
-        refreshRanking(p);
         return ResponseEntity.ok(ApiResponse.ok("Sesión finalizada", dto));
     }
 }

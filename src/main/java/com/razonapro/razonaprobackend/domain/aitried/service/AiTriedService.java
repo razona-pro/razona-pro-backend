@@ -56,7 +56,6 @@ public class AiTriedService {
     private final AiTutor                   aiTutor;
     private final AiModelProperties         aiProps;
     private final ObjectMapper              mapper;
-    private final com.razonapro.razonaprobackend.domain.ranking.service.RankingService rankingService;
 
     // ── Consultas ──────────────────────────────────────────────────────
 
@@ -228,6 +227,9 @@ public class AiTriedService {
         // Persistir en ai_tried_responses
         Competence comp = competenceRepository.findById(q.getCompetenceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Competencia", q.getCompetenceId()));
+        // Mismo instante para created_at y answered_at: si answered_at se calcula antes que
+        // el @Builder.Default de created_at, queda answered_at < created_at y viola el CHECK.
+        LocalDateTime nowTs = LocalDateTime.now();
         aiTriedResponseRepository.save(AiTriedResponse.builder()
                 .programId(at.getProgramId())
                 .studentId(at.getStudentId())
@@ -237,7 +239,8 @@ public class AiTriedService {
                 .studentAnswer(truncate(options.get(sel).text(), 290))
                 .correctAnswer(truncate(options.get(q.getCorrectIndex()).text(), 290))
                 .isCorrect(isCorrect)
-                .answeredAt(LocalDateTime.now())
+                .createdAt(nowTs)
+                .answeredAt(nowTs)
                 .competence(comp)
                 .build());
 
@@ -390,7 +393,7 @@ public class AiTriedService {
         }
 
         // Lógica por niveles + recompensa por racha de subir de nivel (smurfing).
-        double prior   = loadPriorTheta(at.getProgramId(), at.getStudentId(), at.getCompetenceId());
+        double prior   = avgPriorTheta(at.getProgramId(), at.getStudentId(), parseComps(at));
         LevelState st  = computeLevel(questions, startLevel(prior));
         int bonus      = st.bonus();
 
@@ -412,22 +415,7 @@ public class AiTriedService {
             persistTheta(at, cid, finalTheta, answeredForComp);
         }
 
-        // Recalcular ranking tras el commit (sin bloquear la finalización si algo falla).
-        final String sid = at.getStudentId(), pid = at.getProgramId();
-        final java.time.LocalDateTime fin = at.getFinishedAt();
-        if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
-            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
-                new org.springframework.transaction.support.TransactionSynchronization() {
-                    @Override public void afterCommit() {
-                        try { rankingService.refreshForStudent(sid, pid, fin); }
-                        catch (Exception e) { log.error("Ranking refresh IA (afterCommit) falló para {}/{}: {}",
-                                pid, sid, e.getMessage(), e); }
-                    }
-                });
-        } else {
-            try { rankingService.refreshForStudent(sid, pid, fin); }
-            catch (Exception e) { log.error("Ranking refresh IA falló para {}/{}: {}", pid, sid, e.getMessage(), e); }
-        }
+        // El ranking se actualiza por trigger (trg_update_ranking_on_ai_tried) al pasar a FINISHED.
     }
 
     /** Lee el theta acumulado del usuario en la competencia (0.0 si no existe). */
@@ -559,7 +547,8 @@ public class AiTriedService {
                 q.getSelectedIndex(),
                 reveal ? q.getIsCorrect() : (answered ? q.getIsCorrect() : null),
                 (reveal || answered) ? q.getCorrectIndex() : null,
-                (reveal || answered) ? q.getExplanation()  : null);
+                (reveal || answered) ? q.getExplanation()  : null,
+                q.getCompetenceId());
     }
 
     private String writeOptions(List<AiOption> opts) {

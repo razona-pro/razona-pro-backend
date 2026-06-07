@@ -22,6 +22,11 @@ public class PromptFactory {
         5. Español neutro, académico. El enunciado tiene al menos 30 palabras.
         6. NO repitas ni parafrasees los enunciados a evitar.
         7. NO uses el guion largo (-) ni rayas: usa siempre un guion normal (-). Prohibido usar emojis.
+        8. La opción correcta NO debe ser evidente: las 4 opciones deben tener longitud y estilo
+           SIMILARES (que la correcta no sea la más larga, detallada ni la única "bien redactada").
+           Los distractores deben ser errores creíbles. PROHIBIDO usar "todas/ninguna de las anteriores"
+           o pistas gramaticales que delaten la respuesta. Varía la posición de la correcta entre preguntas.
+        9. NUNCA escribas en el "statement" ni en las opciones cuál es la correcta.
 
         ESQUEMA JSON EXACTO (un objeto con un array "questions"):
         {
@@ -47,6 +52,8 @@ public class PromptFactory {
         - Nivel 1: Orientación conceptual. No insinúes la opción correcta.
         - Nivel 2: Descompón el problema o señala la info clave del enunciado.
         - Nivel 3: Pista fuerte; razonamiento hacia la respuesta sin decir la letra. Puedes descartar opciones obvias.
+        REGLA ABSOLUTA: NUNCA reveles la respuesta. Prohibido nombrar la letra (A/B/C/D), citar o
+        parafrasear el texto de la opción correcta, o decir "la respuesta es". Solo orientas el razonamiento.
         Responde SOLO el texto de la pista, sin "Pista:", sin comillas. Máximo 4 oraciones.
         NO uses el guion largo (-) ni rayas: usa siempre un guion normal (-). Prohibido usar emojis.
         """;

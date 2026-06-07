@@ -12,6 +12,7 @@ public class RankingStudentDto {
     private String studentId;
     private String studentName;
     private String programId;
+    private String programName;
     private BigDecimal totalScore;
     private BigDecimal triedsScore;
     private BigDecimal aiTriedsScore;
@@ -19,6 +20,10 @@ public class RankingStudentDto {
     private Integer aiTriedsCount;
 
     public static RankingStudentDto from(RankingStudent rs) {
+        return from(rs, null);
+    }
+
+    public static RankingStudentDto from(RankingStudent rs, String programName) {
         String name = rs.getStudent() != null
                 ? rs.getStudent().getFirstName() + " " + rs.getStudent().getFirstSurname()
                 : null;
@@ -27,6 +32,7 @@ public class RankingStudentDto {
                 .studentId(rs.getStudentId())
                 .studentName(name)
                 .programId(rs.getProgramId())
+                .programName(programName)
                 .totalScore(rs.getTotalScore())
                 .triedsScore(rs.getTriedsScore())
                 .aiTriedsScore(rs.getAiTriedsScore())

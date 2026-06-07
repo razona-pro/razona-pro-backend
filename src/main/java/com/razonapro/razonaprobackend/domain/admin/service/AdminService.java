@@ -68,7 +68,7 @@ public class AdminService {
         // Enviar credenciales por correo (best-effort: no rompe la creación si el correo falla).
         try {
             String name = (saved.getFirstName() + " " + saved.getFirstSurname()).trim();
-            emailService.sendAdminCredentialsEmail(saved.getEmail(), name, rawPassword);
+            emailService.sendAdminCredentialsEmail(saved.getEmail(), name, saved.getAdminId(), rawPassword);
         } catch (Exception ignored) { /* el correo es @Async; cualquier fallo no debe romper la creación */ }
 
         return AdminDto.from(saved);

@@ -144,17 +144,19 @@ public class EmailService {
     // ── Credenciales de administrador (cuenta creada por otro admin) ──────
 
     @Async
-    public void sendAdminCredentialsEmail(String toEmail, String name, String rawPassword) {
+    public void sendAdminCredentialsEmail(String toEmail, String name, String adminCode, String rawPassword) {
         String link    = appProperties.getFrontendUrl() + "/auth";
         String display = capitalize(name);
         String content =
             h1("Tu cuenta de administrador está lista") +
             p("Hola, <strong>" + display + "</strong>. Se creó una cuenta de administrador en " +
               "RazonaPro asociada a este correo. Estas son tus credenciales de acceso:") +
-            infoBox("<strong>Correo:</strong> " + toEmail + "<br>" +
+            infoBox("<strong>Código de administrador:</strong> " + adminCode + "<br>" +
+                    "<strong>Correo:</strong> " + toEmail + "<br>" +
                     "<strong>Contraseña temporal:</strong> " + rawPassword) +
             btn(link, "Iniciar sesión") +
-            p("Por seguridad, te recomendamos cambiar la contraseña después de iniciar sesión.");
+            p("Necesitas el <strong>código de administrador</strong> junto con tu correo y contraseña para ingresar. " +
+              "Por seguridad, te recomendamos cambiar la contraseña después de iniciar sesión.");
         send(toEmail, "Acceso de administrador - RazonaPro", base(content));
     }
 
@@ -192,7 +194,88 @@ public class EmailService {
         send(toEmail, "Nuevo simulacro disponible - RazonaPro", base(content));
     }
 
+    // ── Código de verificación (acción sensible: cambio de contraseña) ─────
+
+    @Async
+    public void sendVerificationCodeEmail(String toEmail, String name, String code) {
+        String display = capitalize(name);
+        String content =
+            h1("Código de verificación") +
+            p("Hola, <strong>" + display + "</strong>. Para continuar con el cambio de contraseña, " +
+              "usa el siguiente código de verificación:") +
+            "<p style=\"text-align:center;margin:8px 0 20px\"><span style=\"display:inline-block;font-family:Georgia,serif;" +
+              "font-size:30px;font-weight:800;letter-spacing:8px;color:#D41224;background:#F8F8F8;border:1px solid #EEE;" +
+              "border-radius:10px;padding:14px 26px\">" + code + "</span></p>" +
+            infoBox("Este código vence en <strong>10 minutos</strong>. Si no solicitaste este cambio, " +
+                    "ignora este mensaje y tu contraseña seguirá igual.");
+        send(toEmail, "Código de verificación - RazonaPro", base(content));
+    }
+
+    // ── Apelaciones ───────────────────────────────────────────────────────
+
+    /** A los admins: un estudiante envió una apelación. */
+    @Async
+    public void sendAppealReceivedAdminEmail(String toEmail, String adminName,
+                                             String studentName, String studentId, String reason, String message) {
+        String link = appProperties.getFrontendUrl() + "/admin/appeals";
+        String reasonTxt = "FRAUD".equals(reason) ? "plagio en un examen" : "decisión administrativa";
+        String content =
+            h1("Nueva apelación de estudiante") +
+            p("Hola, <strong>" + capitalize(adminName) + "</strong>. El estudiante " +
+              "<strong>" + studentName + "</strong> (" + studentId + "), cuya cuenta fue desactivada por " +
+              reasonTxt + ", envió una apelación de reactivación.") +
+            infoBox("<strong>Mensaje del estudiante:</strong><br>" + escapeHtml(message)) +
+            btn(link, "Revisar apelación");
+        send(toEmail, "Nueva apelación de estudiante - RazonaPro", base(content));
+    }
+
+    /** Al estudiante: resultado de su apelación (aprobada/rechazada). */
+    @Async
+    public void sendAppealResolvedEmail(String toEmail, String name, boolean approved, String adminResponse) {
+        String link = appProperties.getFrontendUrl() + "/auth";
+        String content;
+        if (approved) {
+            content =
+                h1("Tu apelación fue aprobada") +
+                p("Hola, <strong>" + capitalize(name) + "</strong>. Tu apelación fue revisada y " +
+                  "<strong>aprobada</strong>. Tu cuenta ha sido reactivada y ya puedes iniciar sesión.") +
+                (adminResponse != null && !adminResponse.isBlank()
+                    ? infoBox("<strong>Nota del administrador:</strong><br>" + escapeHtml(adminResponse)) : "") +
+                btn(link, "Iniciar sesión");
+        } else {
+            content =
+                h1("Tu apelación fue rechazada") +
+                p("Hola, <strong>" + capitalize(name) + "</strong>. Tu apelación fue revisada y " +
+                  "<strong>rechazada</strong>. Tu cuenta permanece desactivada.") +
+                (adminResponse != null && !adminResponse.isBlank()
+                    ? infoBox("<strong>Motivo:</strong><br>" + escapeHtml(adminResponse)) : "") +
+                p("Si consideras que hubo un error, puedes enviar una nueva apelación desde la pantalla de acceso.");
+        }
+        send(toEmail, approved ? "Apelación aprobada - RazonaPro" : "Apelación rechazada - RazonaPro", base(content));
+    }
+
+    /** A los admins: un estudiante fue anulado por plagio y su cuenta desactivada. */
+    @Async
+    public void sendFraudAdminEmail(String toEmail, String adminName, String studentName,
+                                    String studentId, String testName) {
+        String link = appProperties.getFrontendUrl() + "/admin/appeals";
+        String content =
+            h1("Estudiante anulado por plagio") +
+            p("Hola, <strong>" + capitalize(adminName) + "</strong>. El estudiante " +
+              "<strong>" + studentName + "</strong> (" + studentId + ") fue anulado por plagio en el examen " +
+              "<strong>" + escapeHtml(testName) + "</strong> y su cuenta quedó desactivada automáticamente.") +
+            infoBox("El estudiante puede enviar una apelación para solicitar la reactivación.") +
+            btn(link, "Ver apelaciones");
+        send(toEmail, "Alerta de plagio - RazonaPro", base(content));
+    }
+
     // ── Utilidades ────────────────────────────────────────────────────────
+
+    private String escapeHtml(String s) {
+        if (s == null) return "";
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    }
+
 
     private String capitalize(String s) {
         if (s == null || s.isBlank()) return s;
