@@ -40,10 +40,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String userType  = jwtService.getUserType(token);
                 String programId = jwtService.getProgramId(token);
 
-                // Si el estudiante fue desactivado, su token deja de ser válido de inmediato:
-                // no se establece autenticación → las peticiones autenticadas devuelven 401/403.
+                // Si el estudiante fue desactivado, su token deja de ser válido de inmediato.
+                // En rutas protegidas devolvemos 401 ACCOUNT_DISABLED explícito para que el
+                // front lo saque de inmediato con una alerta. En rutas públicas (login,
+                // apelaciones) seguimos como anónimo para que pueda apelar.
                 if ("STUDENT".equals(userType) && !studentRepository.existsByStudentIdAndIsActiveTrue(userId)) {
-                    chain.doFilter(request, response);
+                    String uri = request.getRequestURI();
+                    boolean publicPath = uri.startsWith("/api/auth") || uri.startsWith("/api/appeals")
+                            || uri.startsWith("/api/health") || uri.startsWith("/api/programs/active");
+                    if (publicPath) {
+                        chain.doFilter(request, response);
+                    } else {
+                        response.setStatus(401);
+                        response.setContentType("application/json;charset=UTF-8");
+                        response.getWriter().write(
+                                "{\"success\":false,\"code\":\"ACCOUNT_DISABLED\","
+                                + "\"message\":\"Tu cuenta fue desactivada. No puedes seguir navegando.\"}");
+                    }
                     return;
                 }
 
