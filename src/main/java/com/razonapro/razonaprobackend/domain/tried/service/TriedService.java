@@ -100,7 +100,7 @@ public class TriedService {
      * Incluye cada pregunta con opciones, cuál seleccionó el estudiante,
      * cuál era la correcta y la explicación.
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public TriedReviewDto getReview(String triedId, UserPrincipal principal) {
         Tried tried = triedRepository.findByTriedId(triedId)
                 .orElseThrow(() -> new ResourceNotFoundException("Intento", triedId));
@@ -109,6 +109,14 @@ public class TriedService {
         Set<String> reviewable = Set.of("FINISHED", "ABANDONED", "ANULADO", "TIMED_OUT", "PLAGIO");
         if (!reviewable.contains(tried.getStatus())) {
             throw new ApiException(ErrorCode.TRIED_NOT_FINISHED);
+        }
+
+        // Retroalimentación de un solo uso para el estudiante: tras verla una vez (o salir),
+        // ya no puede volver a abrirla. Los administradores la ven siempre.
+        boolean isAdmin = principal.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        if (!isAdmin && Boolean.TRUE.equals(tried.getReviewViewed())) {
+            throw new ApiException(ErrorCode.REVIEW_ALREADY_VIEWED);
         }
 
         // Cargar respuestas del estudiante indexadas por questionId.
@@ -185,6 +193,12 @@ public class TriedService {
                     .correctOptionId(correctOptionId)
                     .options(optionReviews)
                     .build());
+        }
+
+        // El estudiante consume su única visualización al abrir la retroalimentación.
+        if (!isAdmin && !Boolean.TRUE.equals(tried.getReviewViewed())) {
+            tried.setReviewViewed(true);
+            triedRepository.save(tried);
         }
 
         return TriedReviewDto.builder()

@@ -48,6 +48,7 @@ public enum ErrorCode {
     QUESTION_NO_CORRECT_OPTION(HttpStatus.BAD_REQUEST,       "Debe haber al menos una opción correcta."),
     INVALID_OPTION            (HttpStatus.BAD_REQUEST,       "Opción no válida para esta pregunta."),
     TRIED_NOT_FINISHED        (HttpStatus.BAD_REQUEST,       "El intento aún no ha finalizado."),
+    REVIEW_ALREADY_VIEWED     (HttpStatus.FORBIDDEN,         "La retroalimentación solo puede verse una vez y ya fue consultada."),
     TRIED_ALREADY_FINISHED    (HttpStatus.CONFLICT,          "El intento ya fue finalizado."),
     TRIED_IN_PROGRESS         (HttpStatus.CONFLICT,          "Ya tienes un intento en progreso para este test."),
     QUESTION_ALREADY_ANSWERED (HttpStatus.CONFLICT,          "Ya respondiste esta pregunta."),

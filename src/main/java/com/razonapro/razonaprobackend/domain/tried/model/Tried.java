@@ -42,6 +42,11 @@ public class Tried {
     @Builder.Default
     private Integer fraudAttempts = 0;
 
+    /** Retroalimentación de un solo uso: true tras la primera vez que el estudiante la ve. */
+    @Column(name = "review_viewed", columnDefinition = "CHAR(1)", nullable = false)
+    @Builder.Default
+    private Boolean reviewViewed = false;
+
     @Column(name = "score", precision = 5, scale = 2)
     private BigDecimal score;
 

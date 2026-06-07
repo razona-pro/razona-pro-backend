@@ -68,8 +68,8 @@ public class TriedController {
      * opción correcta y explicación pedagógica.
      */
     @GetMapping("/{triedId}/review")
-    @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Post-test review con feedback completo (solo administradores)")
+    @PreAuthorize("hasAnyRole('ADMIN','STUDENT')")
+    @Operation(summary = "Retroalimentación post-test. El estudiante solo puede verla UNA vez; el admin siempre.")
     public ResponseEntity<ApiResponse<TriedReviewDto>> getReview(
             @PathVariable String triedId,
             @AuthenticationPrincipal UserPrincipal principal) {
