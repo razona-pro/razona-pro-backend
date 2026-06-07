@@ -54,8 +54,9 @@ public interface TriedRepository extends JpaRepository<Tried, TriedId> {
                                                  @Param("end")   java.time.LocalDateTime end);
 
     /**
-     * Ranking POR COMPETENCIA (multicompetencia): suma los puntos PONDERADOS de las
-     * respuestas correctas de esa competencia dentro de intentos EXAM/TIMED FINISHED.
+     * Ranking POR COMPETENCIAS (una o varias): suma los puntos PONDERADOS de las respuestas
+     * correctas de ESAS competencias dentro de intentos EXAM/TIMED FINISHED. El conteo es de
+     * intentos DISTINTOS (no se duplican aunque abarquen varias competencias del conjunto).
      * El peso por dificultad coincide con el motor de puntaje (N/A/B=1, M=2, A=3).
      */
     @Query("""
@@ -70,18 +71,18 @@ public interface TriedRepository extends JpaRepository<Tried, TriedId> {
         WHERE sr.triedId = t.triedId AND sr.studentId = t.studentId AND sr.programId = t.programId
           AND sr.studentId = :studentId AND sr.programId = :programId
           AND sr.isCorrect = true AND sr.optionId IS NOT NULL
-          AND sr.competenceId = :competenceId
+          AND sr.competenceId IN :competenceIds
           AND q.competenceId = sr.competenceId AND q.questionId = sr.questionId
           AND te.testId = t.testId AND te.testMode IN ('EXAM','TIMED')
           AND t.status = 'FINISHED'
           AND (:start IS NULL OR COALESCE(t.finishedAt, t.attemptTimestamp) >= :start)
           AND (:end   IS NULL OR COALESCE(t.finishedAt, t.attemptTimestamp) <= :end)
     """)
-    java.util.List<Object[]> sumTriedsByCompetenceForRanking(@Param("studentId") String studentId,
-                                                             @Param("programId") String programId,
-                                                             @Param("competenceId") String competenceId,
-                                                             @Param("start") java.time.LocalDateTime start,
-                                                             @Param("end")   java.time.LocalDateTime end);
+    java.util.List<Object[]> sumTriedsByCompetencesForRanking(@Param("studentId") String studentId,
+                                                              @Param("programId") String programId,
+                                                              @Param("competenceIds") java.util.Collection<String> competenceIds,
+                                                              @Param("start") java.time.LocalDateTime start,
+                                                              @Param("end")   java.time.LocalDateTime end);
 
     /**
      * % de intentos "satisfactorios" = con al menos 60% de aciertos (correctas/total).

@@ -22,4 +22,5 @@ public final class IdGenerator {
     public static String aiQuestionId(long count)      { return String.format("AQN%09d", count + 1); }
     public static String notificationId(long count)    { return String.format("NOT%09d", count + 1); }
     public static String doubtId(long count)           { return String.format("DBT%09d", count + 1); }
+    public static String appealId(long count)          { return String.format("APL%09d", count + 1); }
 }

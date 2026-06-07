@@ -69,6 +69,12 @@ public enum ErrorCode {
     DOUBT_NOT_FOUND           (HttpStatus.NOT_FOUND,         "Reporte de duda no encontrado."),
     NOTIFICATION_NOT_FOUND    (HttpStatus.NOT_FOUND,         "Notificación no encontrada."),
 
+    // ── Apelaciones ───────────────────────────────────────────────────────
+    APPEAL_NOT_FOUND          (HttpStatus.NOT_FOUND,         "Apelación no encontrada."),
+    APPEAL_ALREADY_PENDING    (HttpStatus.CONFLICT,          "Ya enviaste una apelación que está en revisión."),
+    APPEAL_ALREADY_RESOLVED   (HttpStatus.CONFLICT,          "Esta apelación ya fue resuelta."),
+    ACCOUNT_ALREADY_ACTIVE    (HttpStatus.CONFLICT,          "La cuenta ya está activa; no requiere apelación."),
+
     // ── Servidor (5xx) ────────────────────────────────────────────────────
     INTERNAL_ERROR            (HttpStatus.INTERNAL_SERVER_ERROR, "Ocurrió un error interno. Inténtalo más tarde."),
     EXTERNAL_SERVICE_DOWN     (HttpStatus.SERVICE_UNAVAILABLE,   "Un servicio externo no está disponible.");

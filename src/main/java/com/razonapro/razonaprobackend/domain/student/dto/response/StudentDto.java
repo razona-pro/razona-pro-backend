@@ -17,6 +17,7 @@ public class StudentDto {
     private Boolean emailVerified;
     private Boolean identityVerified;
     private Boolean isActive;
+    private String  deactivationReason;
 
     public static StudentDto from(Student s) {
         return StudentDto.builder()
@@ -31,6 +32,7 @@ public class StudentDto {
                 .emailVerified(s.getEmailVerified())
                 .identityVerified(s.getIdentityVerified())
                 .isActive(s.getIsActive())
+                .deactivationReason(s.getDeactivationReason())
                 .build();
     }
 }

@@ -35,6 +35,7 @@ public class RankingService {
     private final RankingStudentRepository rankingStudentRepository;
     private final TriedRepository          triedRepository;
     private final AiTriedRepository        aiTriedRepository;
+    private final com.razonapro.razonaprobackend.domain.student.repository.StudentRepository studentRepository;
 
     /**
      * Recalcula los puntajes de un estudiante en todos los rankings activos.
@@ -47,7 +48,26 @@ public class RankingService {
     public void refreshForStudent(String studentId, String programId, LocalDateTime finishedAt) {
         LocalDateTime when = (finishedAt != null) ? finishedAt : LocalDateTime.now();
 
-        for (Ranking r : rankingRepository.findByIsActiveTrue()) {
+        List<Ranking> active = rankingRepository.findByIsActiveTrue();
+        if (active.isEmpty()) {
+            log.warn("refreshForStudent: no hay rankings ACTIVOS; nada que actualizar para {}/{}", programId, studentId);
+            return;
+        }
+
+        for (Ranking r : active) {
+            try {
+                refreshOne(r, studentId, programId, when);
+            } catch (Exception e) {
+                // Un ranking con datos inconsistentes no debe impedir actualizar los demás.
+                log.error("refreshForStudent: fallo actualizando ranking {} para {}/{}: {}",
+                        r.getRankingId(), programId, studentId, e.getMessage(), e);
+            }
+        }
+    }
+
+    /** Actualiza (o crea) la fila del estudiante en UN ranking concreto. */
+    private void refreshOne(Ranking r, String studentId, String programId, LocalDateTime when) {
+        {
             LocalDate ps = null, pe = null;
             switch (r.getPeriodType() == null ? "GENERAL" : r.getPeriodType()) {
                 case "DAILY"   -> { ps = when.toLocalDate(); pe = ps; }
@@ -58,22 +78,24 @@ public class RankingService {
             LocalDateTime start = (ps != null) ? ps.atStartOfDay()        : null;
             LocalDateTime end   = (pe != null) ? pe.atTime(23, 59, 59)    : null;
             String src = r.getSourceFilter() == null ? "ALL" : r.getSourceFilter();
-            // Ranking por competencia: si competenceId != null, solo cuenta esa competencia.
-            String comp = (r.getCompetenceId() == null || r.getCompetenceId().isBlank())
-                    ? null : r.getCompetenceId();
+            // Conjunto de competencias del ranking. Vacío = general (todas las competencias).
+            java.util.Set<String> comps = r.getCompetenceIds();
+            boolean general = (comps == null || comps.isEmpty());
 
             BigDecimal triedsScore = BigDecimal.ZERO; long triedsCount = 0;
             if (src.equals("ALL") || src.equals("TRIEDS")) {
-                // General: suma el score del intento. Por competencia (multicompetencia):
-                // suma los puntos ponderados de las respuestas correctas de esa competencia.
-                Object[] row = (comp == null)
+                // General: suma el score del intento. Por competencias (una o varias):
+                // suma los puntos ponderados de las respuestas correctas de ESAS competencias.
+                Object[] row = general
                         ? first(triedRepository.sumTriedsForRanking(studentId, programId, start, end))
-                        : first(triedRepository.sumTriedsByCompetenceForRanking(studentId, programId, comp, start, end));
+                        : first(triedRepository.sumTriedsByCompetencesForRanking(studentId, programId, comps, start, end));
                 if (row != null) { triedsScore = toBig(row[0]); triedsCount = toLong(row[1]); }
             }
             BigDecimal aiScore = BigDecimal.ZERO; long aiCount = 0;
             if (src.equals("ALL") || src.equals("AI_TRIEDS")) {
-                Object[] row = first(aiTriedRepository.sumAiForRanking(studentId, programId, comp, start, end));
+                Object[] row = general
+                        ? first(aiTriedRepository.sumAiForRanking(studentId, programId, null, start, end))
+                        : first(aiTriedRepository.sumAiByCompetencesForRanking(studentId, programId, comps, start, end));
                 if (row != null) { aiScore = toBig(row[0]); aiCount = toLong(row[1]); }
             }
 
@@ -96,6 +118,30 @@ public class RankingService {
             rs.setLastActivityAt(LocalDateTime.now());
             rankingStudentRepository.save(rs);
         }
+    }
+
+    /**
+     * Recalcula TODOS los rankings para TODOS los estudiantes. Herramienta de reparación
+     * del admin: repuebla las tablas de posiciones a partir de los intentos ya existentes
+     * (útil tras crear un ranking nuevo o si quedó algo desincronizado). A diferencia del
+     * refresco automático, aquí los errores SÍ se propagan para que el admin los vea.
+     *
+     * @return nº de estudiantes procesados.
+     */
+    @Transactional
+    public int recomputeAll() {
+        var students = studentRepository.findAll();
+        LocalDateTime now = LocalDateTime.now();
+        int processed = 0;
+        for (var s : students) {
+            for (Ranking r : rankingRepository.findByIsActiveTrue()) {
+                refreshOne(r, s.getStudentId(), s.getProgramId(), now);
+            }
+            processed++;
+        }
+        log.info("recomputeAll: {} estudiantes recalculados en {} ranking(s) activos",
+                processed, rankingRepository.findByIsActiveTrue().size());
+        return processed;
     }
 
     private static Object[] first(List<Object[]> rows) { return (rows == null || rows.isEmpty()) ? null : rows.get(0); }
@@ -125,8 +171,7 @@ public class RankingService {
                 .description(req.getDescription())
                 .periodType(req.getPeriodType())
                 .sourceFilter(req.getSourceFilter())
-                .competenceId((req.getCompetenceId() == null || req.getCompetenceId().isBlank())
-                        ? null : req.getCompetenceId().trim())
+                .competenceIds(cleanComps(req.getCompetenceIds()))
                 .build();
         return RankingDto.from(rankingRepository.save(ranking));
     }
@@ -157,8 +202,21 @@ public class RankingService {
         if (req.getDescription()  != null) r.setDescription(req.getDescription());
         if (req.getPeriodType()   != null) r.setPeriodType(req.getPeriodType());
         if (req.getSourceFilter() != null) r.setSourceFilter(req.getSourceFilter());
-        r.setCompetenceId((req.getCompetenceId() == null || req.getCompetenceId().isBlank())
-                ? null : req.getCompetenceId().trim());
+        if (req.getCompetenceIds() != null) {
+            r.getCompetenceIds().clear();
+            r.getCompetenceIds().addAll(cleanComps(req.getCompetenceIds()));
+        }
         return RankingDto.from(rankingRepository.save(r));
+    }
+
+    /** Normaliza la lista de competencias: trim + UPPER, sin vacíos ni duplicados; conserva el orden. */
+    private static java.util.Set<String> cleanComps(java.util.List<String> raw) {
+        java.util.LinkedHashSet<String> out = new java.util.LinkedHashSet<>();
+        if (raw != null) {
+            for (String c : raw) {
+                if (c != null && !c.isBlank()) out.add(c.trim().toUpperCase());
+            }
+        }
+        return out;
     }
 }

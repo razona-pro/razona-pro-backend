@@ -70,12 +70,21 @@ public class TriedController {
      * opción correcta y explicación pedagógica.
      */
     @GetMapping("/{triedId}/review")
-    @PreAuthorize("hasAnyRole('ADMIN','STUDENT')")
-    @Operation(summary = "Post-test review con feedback completo")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Post-test review con feedback completo (solo administradores)")
     public ResponseEntity<ApiResponse<TriedReviewDto>> getReview(
             @PathVariable String triedId,
             @AuthenticationPrincipal UserPrincipal principal) {
         return ResponseEntity.ok(ApiResponse.ok(triedService.getReview(triedId, principal)));
+    }
+
+    @GetMapping("/{triedId}/breakdown")
+    @PreAuthorize("hasAnyRole('ADMIN','STUDENT')")
+    @Operation(summary = "Desglose de aciertos por competencia (sin revelar respuestas; lo ve el estudiante dueño)")
+    public ResponseEntity<ApiResponse<java.util.List<com.razonapro.razonaprobackend.domain.tried.dto.response.CompetenceBreakdownDto>>> breakdown(
+            @PathVariable String triedId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(ApiResponse.ok(triedService.getCompetenceBreakdown(triedId, principal)));
     }
 
     @GetMapping("/eligibility")

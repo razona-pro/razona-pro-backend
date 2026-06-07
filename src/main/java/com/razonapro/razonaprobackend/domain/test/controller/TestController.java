@@ -2,6 +2,7 @@ package com.razonapro.razonaprobackend.domain.test.controller;
 
 import com.razonapro.razonaprobackend.domain.question.dto.response.QuestionDto;
 import com.razonapro.razonaprobackend.domain.test.dto.request.TestRequest;
+import com.razonapro.razonaprobackend.domain.test.dto.request.TestUpdateRequest;
 import com.razonapro.razonaprobackend.domain.test.dto.response.TestDto;
 import com.razonapro.razonaprobackend.domain.test.service.TestService;
 import com.razonapro.razonaprobackend.infrastructure.security.UserPrincipal;
@@ -32,6 +33,16 @@ public class TestController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<TestDto>> activate(@PathVariable String testId) {
         return ResponseEntity.ok(ApiResponse.ok(testService.activate(testId)));
+    }
+
+    /** Edita una prueba (nombre, descripción, duración, modo, nº de preguntas, estado). */
+    @PutMapping("/{testId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<TestDto>> update(
+            @PathVariable String testId,
+            @Valid @RequestBody TestUpdateRequest req,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(ApiResponse.ok(testService.update(testId, req, principal)));
     }
 
     @GetMapping

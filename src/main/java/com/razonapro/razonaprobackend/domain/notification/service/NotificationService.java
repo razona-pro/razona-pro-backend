@@ -17,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -58,7 +59,11 @@ public class NotificationService {
     }
 
     // ── Creación individual (in-app) ──
-    @Transactional
+    // REQUIRES_NEW: una notificación es un efecto secundario. Si falla (p. ej. colisión
+    // de id), NO debe revertir la operación de negocio que la disparó (desactivar por
+    // plagio, etc.); y si la operación de negocio se revierte, la notificación ya no
+    // contamina su transacción. Cada notificación se confirma de forma independiente.
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void notify(String recipientId, String recipientType, String type,
                        String title, String body, String link) {
         repo.save(Notification.builder()

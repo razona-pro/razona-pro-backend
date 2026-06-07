@@ -24,9 +24,11 @@ import java.util.concurrent.ConcurrentHashMap;
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
 public class AuthRateLimitFilter extends OncePerRequestFilter {
 
-    private static final int    MAX_REQUESTS   = 10;
-    private static final long   WINDOW_MINUTES = 1;
-    private static final String ENDPOINT_PREFIX = "/api/auth/";
+    private static final int      MAX_REQUESTS   = 10;
+    private static final long     WINDOW_MINUTES = 1;
+    // Endpoints sensibles que re-validan credenciales (login, recuperación, apelaciones públicas).
+    private static final String[] ENDPOINT_PREFIXES = {
+            "/api/auth/", "/api/appeals/account-status", "/api/appeals/submit" };
 
     private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
 
@@ -43,7 +45,12 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
                                     HttpServletResponse res,
                                     FilterChain chain) throws ServletException, IOException {
 
-        if (!req.getRequestURI().startsWith(ENDPOINT_PREFIX)) {
+        String uri = req.getRequestURI();
+        boolean rateLimited = false;
+        for (String prefix : ENDPOINT_PREFIXES) {
+            if (uri.startsWith(prefix)) { rateLimited = true; break; }
+        }
+        if (!rateLimited) {
             chain.doFilter(req, res);
             return;
         }

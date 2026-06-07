@@ -32,9 +32,16 @@ public class Ranking implements Normalizable {
     @Column(name = "source_filter", length = 10, nullable = false)
     private String sourceFilter;
 
-    /** Competencia del ranking. null = ranking general (todas las competencias). */
+    /**
+     * Competencias que abarca el ranking. Vacío = ranking general (todas las competencias).
+     * Una o más = el ranking solo cuenta esas competencias (p. ej. Lectura + Razonamiento).
+     */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "rankings_competences",
+            joinColumns = @JoinColumn(name = "ranking_id"))
     @Column(name = "competence_id", length = 6)
-    private String competenceId;
+    @Builder.Default
+    private java.util.Set<String> competenceIds = new java.util.LinkedHashSet<>();
 
     @Column(name = "is_active", columnDefinition = "CHAR(1)", nullable = false)
     @Builder.Default

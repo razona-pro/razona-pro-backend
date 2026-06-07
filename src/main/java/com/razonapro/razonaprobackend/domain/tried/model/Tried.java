@@ -32,7 +32,7 @@ public class Tried {
     @JoinColumn(name = "test_id", referencedColumnName = "test_id", insertable = false, updatable = false)
     private Test test;
 
-    /** IN_PROGRESS | FINISHED | ABANDONED | TIMED_OUT | ANULADO (anulado por fraude) */
+    /** IN_PROGRESS | FINISHED | ABANDONED | TIMED_OUT | ANULADO | PLAGIO (anulado por plagio + cuenta desactivada) */
     @Column(name = "status", length = 15, nullable = false)
     @Builder.Default
     private String status = "IN_PROGRESS";

@@ -23,7 +23,9 @@ public class RankingRequest {
     @Pattern(regexp = "^(ALL|TRIEDS|AI_TRIEDS)$")
     private String sourceFilter;
 
-    /** Competencia del ranking (opcional). Vacío/null = ranking general de todas las competencias. */
-    @Size(max = 6)
-    private String competenceId;
+    /**
+     * Competencias del ranking (opcional). Vacío/null = ranking general de todas las competencias.
+     * Una o más = el ranking solo cuenta esas competencias.
+     */
+    private java.util.List<@Size(max = 6) String> competenceIds;
 }

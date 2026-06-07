@@ -99,7 +99,8 @@ public class AiTriedController {
     }
 
     @GetMapping("/{aiTriedId}/review")
-    @Operation(summary = "Historial detallado con respuestas y explicaciones")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Historial detallado con respuestas y explicaciones (solo administradores)")
     public ResponseEntity<ApiResponse<List<AiQuestionDto>>> review(
             @PathVariable String aiTriedId, @AuthenticationPrincipal UserPrincipal p) {
         return ResponseEntity.ok(ApiResponse.ok(service.getReview(aiTriedId, p)));

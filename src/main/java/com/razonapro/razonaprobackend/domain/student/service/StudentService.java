@@ -41,6 +41,7 @@ public class StudentService {
         Student s = studentRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Estudiante", studentId));
         s.setIsActive(true);
+        s.setDeactivationReason(null);   // al reactivar se limpia el motivo
         return StudentDto.from(studentRepository.save(s));
     }
 
@@ -66,7 +67,11 @@ public class StudentService {
             s.setEmail(email);
         }
         if (StringUtils.hasText(req.getPhone()))         s.setPhone(req.getPhone().trim());
-        if (req.getIsActive() != null)                   s.setIsActive(req.getIsActive());
+        if (req.getIsActive() != null) {
+            s.setIsActive(req.getIsActive());
+            // Reactivar limpia el motivo; desactivar manualmente lo marca como MANUAL.
+            s.setDeactivationReason(Boolean.TRUE.equals(req.getIsActive()) ? null : "MANUAL");
+        }
 
         return StudentDto.from(studentRepository.save(s));
     }
@@ -76,6 +81,7 @@ public class StudentService {
         Student s = studentRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Estudiante", studentId));
         s.setIsActive(false);
+        s.setDeactivationReason("MANUAL");
         studentRepository.save(s);
     }
 }

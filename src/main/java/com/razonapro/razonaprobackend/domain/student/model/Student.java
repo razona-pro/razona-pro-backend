@@ -49,6 +49,10 @@ public class Student implements Normalizable {
     @Builder.Default
     private Boolean isActive = true;
 
+    /** Motivo de desactivación: 'FRAUD' (plagio), 'MANUAL' (admin) o null si está activa. */
+    @Column(name = "deactivation_reason", length = 10)
+    private String deactivationReason;
+
     @Column(name = "email_verified", nullable = false, length = 1)
     @Builder.Default
     private Boolean emailVerified = false;

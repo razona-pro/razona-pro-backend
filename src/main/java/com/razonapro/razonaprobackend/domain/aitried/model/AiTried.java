@@ -58,8 +58,16 @@ public class AiTried {
     @Column(name = "description", length = 200)
     private String description;
 
+    /** Competencia principal (la primera elegida). Se conserva por compatibilidad y para mostrar. */
     @Column(name = "competence_id", length = 6)
     private String competenceId;
+
+    /**
+     * Competencias de la sesión separadas por coma (multi-competencia). La sesión va rotando
+     * entre ellas al generar cada pregunta. Si es null, se usa solo competenceId.
+     */
+    @Column(name = "competence_ids", length = 80)
+    private String competenceIdsCsv;
 
     @Column(name = "theta", precision = 5, scale = 3)
     @Builder.Default

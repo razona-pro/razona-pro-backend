@@ -13,6 +13,7 @@ import com.razonapro.razonaprobackend.domain.tried.dto.request.StartTriedRequest
 import com.razonapro.razonaprobackend.domain.tried.dto.request.SubmitAnswerRequest;
 import com.razonapro.razonaprobackend.domain.admin.repository.AdminRepository;
 import com.razonapro.razonaprobackend.domain.notification.service.NotificationService;
+import com.razonapro.razonaprobackend.domain.tried.dto.response.CompetenceBreakdownDto;
 import com.razonapro.razonaprobackend.domain.tried.dto.response.TriedDto;
 import com.razonapro.razonaprobackend.domain.tried.dto.response.TriedEligibilityDto;
 import com.razonapro.razonaprobackend.domain.tried.dto.response.TriedResumeDto;
@@ -31,6 +32,7 @@ import com.razonapro.razonaprobackend.shared.ids.OptionId;
 import com.razonapro.razonaprobackend.shared.ids.QuestionId;
 import com.razonapro.razonaprobackend.shared.ids.TestPK;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -47,6 +49,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class TriedService {
@@ -103,7 +106,7 @@ public class TriedService {
                 .orElseThrow(() -> new ResourceNotFoundException("Intento", triedId));
         assertOwnership(tried, principal);
 
-        Set<String> reviewable = Set.of("FINISHED", "ABANDONED", "ANULADO", "TIMED_OUT");
+        Set<String> reviewable = Set.of("FINISHED", "ABANDONED", "ANULADO", "TIMED_OUT", "PLAGIO");
         if (!reviewable.contains(tried.getStatus())) {
             throw new ApiException(ErrorCode.TRIED_NOT_FINISHED);
         }
@@ -186,6 +189,33 @@ public class TriedService {
                 .finishedAt(tried.getFinishedAt())
                 .questions(questionReviews)
                 .build();
+    }
+
+    /**
+     * Desglose de aciertos por competencia de un intento finalizado, SIN revelar las
+     * respuestas correctas ni las explicaciones. Lo puede ver el propio estudiante
+     * (a diferencia del review completo, que es solo para administradores).
+     */
+    @Transactional(readOnly = true)
+    public List<CompetenceBreakdownDto> getCompetenceBreakdown(String triedId, UserPrincipal principal) {
+        Tried tried = triedRepository.findByTriedId(triedId)
+                .orElseThrow(() -> new ResourceNotFoundException("Intento", triedId));
+        assertOwnership(tried, principal);
+
+        Map<String, int[]> byComp = new LinkedHashMap<>();   // competenceId -> [correct, total]
+        for (StudentResponse r : responseRepository.findByTriedId(triedId)) {
+            if (r.getOptionId() == null) continue;            // no contar las sin responder
+            int[] agg = byComp.computeIfAbsent(r.getCompetenceId(), k -> new int[2]);
+            agg[1]++;
+            if (Boolean.TRUE.equals(r.getIsCorrect())) agg[0]++;
+        }
+        return byComp.entrySet().stream()
+                .map(e -> CompetenceBreakdownDto.builder()
+                        .competenceId(e.getKey())
+                        .correct(e.getValue()[0])
+                        .total(e.getValue()[1])
+                        .build())
+                .toList();
     }
 
     // ── Elegibilidad: ¿puede el estudiante entrar a esta prueba? ──────────
@@ -422,7 +452,8 @@ public class TriedService {
 
     /**
      * Registra un evento sospechoso (cambio de pestaña, salir de pantalla, etc.).
-     * Al superar FRAUD_LIMIT, el intento se anula (ANULADO) y se notifica a los admins.
+     * Se toleran hasta FRAUD_LIMIT eventos: al alcanzarlos, el intento queda en estado
+     * PLAGIO, la cuenta del estudiante se DESACTIVA y se notifica a los admins.
      * No aplica en modo PRACTICE (la práctica es libre).
      */
     @Transactional
@@ -443,13 +474,21 @@ public class TriedService {
         tried.setFraudAttempts(count);
 
         if (count >= FRAUD_LIMIT) {
-            tried.setStatus("ANULADO");
+            // 1) Cambios CRÍTICOS que SÍ deben persistir: marcar el intento como PLAGIO
+            //    y desactivar la cuenta del estudiante. Se guardan primero.
+            tried.setStatus("PLAGIO");
             tried.setFinishedAt(LocalDateTime.now());
             createUnansweredResponses(tried);
             calculateScore(tried);
+            triedRepository.save(tried);
             deactivateStudentForFraud(principal);
-            notifyAdminsFraud(tried, principal);
-            notifyStudentDeactivated(principal);
+
+            // 2) Notificaciones best-effort: corren en transacción propia (REQUIRES_NEW),
+            //    así un fallo aquí NUNCA revierte la anulación ni la desactivación.
+            try { notifyAdminsFraud(tried, principal); }
+            catch (Exception e) { /* no romper el flujo de plagio por una notificación */ }
+            try { notifyStudentDeactivated(principal); }
+            catch (Exception e) { /* idem */ }
         }
         return TriedDto.from(triedRepository.save(tried));
     }
@@ -458,6 +497,7 @@ public class TriedService {
     private void deactivateStudentForFraud(UserPrincipal principal) {
         studentRepository.findByStudentId(principal.getId()).ifPresent(s -> {
             s.setIsActive(false);
+            s.setDeactivationReason("FRAUD");
             studentRepository.save(s);
         });
     }
@@ -566,12 +606,14 @@ public class TriedService {
                 new org.springframework.transaction.support.TransactionSynchronization() {
                     @Override public void afterCommit() {
                         try { rankingService.refreshForStudent(studentId, programId, finishedAt); }
-                        catch (Exception ignored) { /* el ranking nunca debe romper el flujo */ }
+                        catch (Exception e) { log.error("Ranking refresh (afterCommit) falló para {}/{}: {}",
+                                programId, studentId, e.getMessage(), e); }
                     }
                 });
         } else {
             try { rankingService.refreshForStudent(studentId, programId, finishedAt); }
-            catch (Exception ignored) { /* idem */ }
+            catch (Exception e) { log.error("Ranking refresh falló para {}/{}: {}",
+                    programId, studentId, e.getMessage(), e); }
         }
     }
 

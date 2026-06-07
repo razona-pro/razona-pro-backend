@@ -132,25 +132,35 @@ public class AiTriedService {
         if (!questionGenerator.isAvailable())
             throw new ApiException(ErrorCode.AI_MODULE_DISABLED);
 
-        Competence comp = competenceRepository.findById(req.getCompetenceId())
-                .orElseThrow(() -> new ResourceNotFoundException("Competencia", req.getCompetenceId()));
+        // Normalizar y validar las competencias elegidas (1..N).
+        List<String> compIds = cleanComps(req.getCompetenceIds());
+        if (compIds.isEmpty())
+            throw new ApiException(ErrorCode.INVALID_INPUT, "Selecciona al menos una competencia.");
+        for (String cid : compIds)
+            competenceRepository.findById(cid)
+                    .orElseThrow(() -> new ResourceNotFoundException("Competencia", cid));
 
-        // IRT acumulativo: arrancamos desde el theta que el usuario trae en esta competencia.
-        double priorTheta = loadPriorTheta(p.getProgramId(), p.getId(), comp.getCompetenceId());
+        String primary = compIds.get(0);
+        Competence firstComp = competenceRepository.findById(primary)
+                .orElseThrow(() -> new ResourceNotFoundException("Competencia", primary));
+
+        // IRT acumulativo: arrancamos desde el theta promedio del usuario en esas competencias.
+        double priorTheta = avgPriorTheta(p.getProgramId(), p.getId(), compIds);
 
         AiTried at = AiTried.builder()
                 .programId(p.getProgramId())
                 .studentId(p.getId())
                 .aiTriedId(IdGenerator.aiTriedId(aiTriedRepository.count()))
-                .competenceId(comp.getCompetenceId())
+                .competenceId(primary)
+                .competenceIdsCsv(String.join(",", compIds))
                 .totalQuestions(req.getTotalQuestions())
                 .description(req.getDescription())
                 .theta(BigDecimal.valueOf(priorTheta).setScale(3, RoundingMode.HALF_UP))
                 .build();
         aiTriedRepository.save(at);
 
-        // Primera pregunta en el nivel inicial del usuario (derivado del progreso acumulado).
-        AiQuestion first = generateAndSave(at, comp, 1, startLevel(priorTheta));
+        // Primera pregunta (competencia índice 0) en el nivel inicial derivado del progreso.
+        AiQuestion first = generateAndSave(at, firstComp, 1, startLevel(priorTheta));
         aiTriedRepository.save(at);   // persistir questionsGenerated / maxPossibleScore
         return new AiStartResponseDto(AiTriedDto.from(at), toDto(first, req.getTotalQuestions(), false), 1);
     }
@@ -170,11 +180,14 @@ public class AiTriedService {
             throw new ApiException(ErrorCode.TRIED_ALREADY_FINISHED, "Ya se generaron todas las preguntas.");
 
         // Dificultad objetivo según la máquina de niveles (3 aciertos suben, 2 fallos bajan).
-        double prior  = loadPriorTheta(at.getProgramId(), at.getStudentId(), at.getCompetenceId());
+        List<String> compIds = parseComps(at);
+        double prior  = avgPriorTheta(at.getProgramId(), at.getStudentId(), compIds);
         int    target = computeLevel(existing, startLevel(prior)).level();
 
-        Competence comp = competenceRepository.findById(at.getCompetenceId())
-                .orElseThrow(() -> new ResourceNotFoundException("Competencia", at.getCompetenceId()));
+        // Multi-competencia: se rota entre las competencias elegidas por orden de pregunta.
+        String cid = compIds.get((nextOrder - 1) % compIds.size());
+        Competence comp = competenceRepository.findById(cid)
+                .orElseThrow(() -> new ResourceNotFoundException("Competencia", cid));
 
         AiQuestion q = generateAndSave(at, comp, nextOrder, target);
 
@@ -243,7 +256,7 @@ public class AiTriedService {
         Double finalScore = null;
         int nextDiff = 0;
 
-        double prior = loadPriorTheta(at.getProgramId(), at.getStudentId(), at.getCompetenceId());
+        double prior = avgPriorTheta(at.getProgramId(), at.getStudentId(), parseComps(at));
         if (finished) {
             finishAiTried(at, all);
             finalScore = at.getScore() != null ? at.getScore().doubleValue() : 0.0;
@@ -336,7 +349,7 @@ public class AiTriedService {
                 .programId(at.getProgramId())
                 .studentId(at.getStudentId())
                 .aiTriedId(at.getAiTriedId())
-                .competenceId(at.getCompetenceId())
+                .competenceId(comp.getCompetenceId())   // competencia REAL de esta pregunta (multi-competencia)
                 .questionOrder(order)
                 .statement(clean(g.statement()))
                 .optionsJson(writeOptions(cleanedOptions))
@@ -388,10 +401,16 @@ public class AiTriedService {
         // El puntaje final pondera por nivel y suma el bonus por rachas de ascenso.
         at.setScore(BigDecimal.valueOf(earned + bonus).setScale(2, RoundingMode.HALF_UP));
 
-        // Progreso acumulado: persistir el nivel alcanzado como theta.
+        // Progreso acumulado: persistir el nivel alcanzado como theta para CADA competencia
+        // de la sesión (con el nº de preguntas respondidas de esa competencia).
         double finalTheta = levelToTheta(st.level());
         at.setTheta(BigDecimal.valueOf(finalTheta).setScale(3, RoundingMode.HALF_UP));
-        persistTheta(at, finalTheta, answered);
+        for (String cid : parseComps(at)) {
+            int answeredForComp = (int) questions.stream()
+                    .filter(q -> cid.equals(q.getCompetenceId()) && q.getSelectedIndex() != null)
+                    .count();
+            persistTheta(at, cid, finalTheta, answeredForComp);
+        }
 
         // Recalcular ranking tras el commit (sin bloquear la finalización si algo falla).
         final String sid = at.getStudentId(), pid = at.getProgramId();
@@ -400,11 +419,14 @@ public class AiTriedService {
             org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
                 new org.springframework.transaction.support.TransactionSynchronization() {
                     @Override public void afterCommit() {
-                        try { rankingService.refreshForStudent(sid, pid, fin); } catch (Exception ignored) {}
+                        try { rankingService.refreshForStudent(sid, pid, fin); }
+                        catch (Exception e) { log.error("Ranking refresh IA (afterCommit) falló para {}/{}: {}",
+                                pid, sid, e.getMessage(), e); }
                     }
                 });
         } else {
-            try { rankingService.refreshForStudent(sid, pid, fin); } catch (Exception ignored) {}
+            try { rankingService.refreshForStudent(sid, pid, fin); }
+            catch (Exception e) { log.error("Ranking refresh IA falló para {}/{}: {}", pid, sid, e.getMessage(), e); }
         }
     }
 
@@ -416,15 +438,47 @@ public class AiTriedService {
                 .orElse(0.0);
     }
 
-    /** Upsert del theta acumulado del usuario tras finalizar un intento. */
-    private void persistTheta(AiTried at, double theta, int answeredDelta) {
+    /** Theta inicial promedio del usuario sobre el conjunto de competencias de la sesión. */
+    private double avgPriorTheta(String programId, String studentId, List<String> competenceIds) {
+        if (competenceIds == null || competenceIds.isEmpty()) return 0.0;
+        double sum = 0;
+        for (String cid : competenceIds) sum += loadPriorTheta(programId, studentId, cid);
+        return sum / competenceIds.size();
+    }
+
+    /** Competencias de la sesión (desde el CSV; cae a la principal si está vacío). */
+    private List<String> parseComps(AiTried at) {
+        if (at.getCompetenceIdsCsv() != null && !at.getCompetenceIdsCsv().isBlank()) {
+            List<String> out = new ArrayList<>();
+            for (String s : at.getCompetenceIdsCsv().split(",")) {
+                String c = s.trim();
+                if (!c.isEmpty()) out.add(c);
+            }
+            if (!out.isEmpty()) return out;
+        }
+        return at.getCompetenceId() != null ? List.of(at.getCompetenceId()) : List.of();
+    }
+
+    /** Normaliza la lista de competencias: trim + UPPER, sin vacíos ni duplicados; conserva el orden. */
+    private static List<String> cleanComps(List<String> raw) {
+        java.util.LinkedHashSet<String> out = new java.util.LinkedHashSet<>();
+        if (raw != null) {
+            for (String c : raw) {
+                if (c != null && !c.isBlank()) out.add(c.trim().toUpperCase());
+            }
+        }
+        return new ArrayList<>(out);
+    }
+
+    /** Upsert del theta acumulado del usuario en UNA competencia tras finalizar un intento. */
+    private void persistTheta(AiTried at, String competenceId, double theta, int answeredDelta) {
         AiUserCompetenceId id = new AiUserCompetenceId(
-                at.getProgramId(), at.getStudentId(), at.getCompetenceId());
+                at.getProgramId(), at.getStudentId(), competenceId);
         AiUserCompetence u = aiUserCompetenceRepository.findById(id).orElseGet(() ->
                 AiUserCompetence.builder()
                         .programId(at.getProgramId())
                         .studentId(at.getStudentId())
-                        .competenceId(at.getCompetenceId())
+                        .competenceId(competenceId)
                         .build());
         u.setTheta(BigDecimal.valueOf(Math.max(-3.0, Math.min(3.0, theta)))
                 .setScale(3, RoundingMode.HALF_UP));

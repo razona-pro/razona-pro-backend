@@ -13,6 +13,8 @@ public class AiTriedDto {
     private String studentId;
     private String programId;
     private String competenceId;
+    /** Competencias de la sesión (multi-competencia); incluye al menos la principal. */
+    private java.util.List<String> competenceIds;
     private String status;
     private BigDecimal score;
     private Integer totalQuestions;       // preguntas solicitadas al iniciar
@@ -31,6 +33,7 @@ public class AiTriedDto {
                 .studentId(a.getStudentId())
                 .programId(a.getProgramId())
                 .competenceId(a.getCompetenceId())
+                .competenceIds(parseComps(a))
                 .status(a.getStatus())
                 .score(a.getScore())
                 .totalQuestions(a.getTotalQuestions())
@@ -43,5 +46,18 @@ public class AiTriedDto {
                 .attemptTimestamp(a.getAttemptTimestamp())
                 .finishedAt(a.getFinishedAt())
                 .build();
+    }
+
+    /** Competencias de la sesión desde el CSV (cae a la principal si está vacío). */
+    private static java.util.List<String> parseComps(AiTried a) {
+        if (a.getCompetenceIdsCsv() != null && !a.getCompetenceIdsCsv().isBlank()) {
+            java.util.List<String> out = new java.util.ArrayList<>();
+            for (String s : a.getCompetenceIdsCsv().split(",")) {
+                String c = s.trim();
+                if (!c.isEmpty()) out.add(c);
+            }
+            if (!out.isEmpty()) return out;
+        }
+        return a.getCompetenceId() != null ? java.util.List.of(a.getCompetenceId()) : java.util.List.of();
     }
 }

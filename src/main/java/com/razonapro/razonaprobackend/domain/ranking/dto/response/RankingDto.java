@@ -4,6 +4,8 @@ import com.razonapro.razonaprobackend.domain.ranking.model.Ranking;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.util.List;
+
 @Getter @Builder
 public class RankingDto {
     private String rankingId;
@@ -11,7 +13,8 @@ public class RankingDto {
     private String description;
     private String periodType;
     private String sourceFilter;
-    private String competenceId;
+    /** Competencias del ranking; vacío = todas (general). */
+    private List<String> competenceIds;
     private Boolean isActive;
 
     public static RankingDto from(Ranking r) {
@@ -21,7 +24,7 @@ public class RankingDto {
                 .description(r.getDescription())
                 .periodType(r.getPeriodType())
                 .sourceFilter(r.getSourceFilter())
-                .competenceId(r.getCompetenceId())
+                .competenceIds(r.getCompetenceIds() == null ? List.of() : List.copyOf(r.getCompetenceIds()))
                 .isActive(r.getIsActive())
                 .build();
     }

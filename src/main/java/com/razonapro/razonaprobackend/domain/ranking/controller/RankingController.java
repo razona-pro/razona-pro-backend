@@ -51,6 +51,14 @@ public class RankingController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(rankingService.create(req)));
     }
 
+    /** Reparación: recalcula las tablas de posiciones a partir de los intentos existentes. */
+    @PostMapping("/recompute")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Integer>> recompute() {
+        int processed = rankingService.recomputeAll();
+        return ResponseEntity.ok(ApiResponse.ok("Rankings recalculados", processed));
+    }
+
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<RankingDto>> update(
