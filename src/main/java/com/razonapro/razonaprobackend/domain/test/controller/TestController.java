@@ -67,11 +67,14 @@ public class TestController {
     @PreAuthorize("hasAnyRole('ADMIN','STUDENT')")
     public ResponseEntity<ApiResponse<List<QuestionDto>>> getQuestions(
             @PathVariable String testId,
+            @RequestParam(required = false) String triedId,
             @AuthenticationPrincipal UserPrincipal principal) {
         boolean showCorrect = principal.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        // triedId hace la selección de preguntas DETERMINISTA por intento (consistente con
+        // startTried y con las "sin responder" del cierre); sin él se devuelven todas.
         return ResponseEntity.ok(ApiResponse.ok(
-                testService.getTestQuestions(testId, showCorrect)));
+                testService.getTestQuestions(testId, showCorrect, triedId)));
     }
 
     @PostMapping

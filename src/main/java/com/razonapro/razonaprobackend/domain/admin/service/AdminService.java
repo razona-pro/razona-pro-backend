@@ -100,10 +100,12 @@ public class AdminService {
         Admin admin = adminRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Admin", id));
 
-        if (StringUtils.hasText(req.getFirstName()))     admin.setFirstName(req.getFirstName());
-        if (StringUtils.hasText(req.getSecondName()))    admin.setSecondName(req.getSecondName());
-        if (StringUtils.hasText(req.getFirstSurname()))  admin.setFirstSurname(req.getFirstSurname());
-        if (StringUtils.hasText(req.getSecondSurname())) admin.setSecondSurname(req.getSecondSurname());
+        if (StringUtils.hasText(req.getFirstName()))     admin.setFirstName(req.getFirstName().trim());
+        // Segundo nombre/apellido son OPCIONALES: si llega el campo (aunque vacío) se aplica,
+        // permitiendo BORRARLOS. null = el cliente no lo envió → se conserva.
+        if (req.getSecondName() != null)                 admin.setSecondName(req.getSecondName().isBlank() ? null : req.getSecondName().trim());
+        if (StringUtils.hasText(req.getFirstSurname()))  admin.setFirstSurname(req.getFirstSurname().trim());
+        if (req.getSecondSurname() != null)              admin.setSecondSurname(req.getSecondSurname().isBlank() ? null : req.getSecondSurname().trim());
         if (StringUtils.hasText(req.getEmail())) {
             String email = req.getEmail().trim().toLowerCase();
             if (!email.equals(admin.getEmail()) && adminRepository.existsByEmail(email))

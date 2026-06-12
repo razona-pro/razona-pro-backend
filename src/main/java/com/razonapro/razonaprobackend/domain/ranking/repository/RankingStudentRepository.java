@@ -10,13 +10,21 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface RankingStudentRepository extends JpaRepository<RankingStudent, Integer> {
 
+    // Solo aparecen estudiantes con actividad REAL en este ranking. Cada finalización crea/actualiza
+    // una fila en TODOS los rankings activos, así que sin este filtro salían estudiantes con
+    // "0 pruebas" (p. ej. quien solo hizo IA en un ranking de solo-pruebas).
     @Query(value = """
         SELECT rs FROM RankingStudent rs
         JOIN FETCH rs.student s
         WHERE rs.ranking.rankingId = :rankingId
+          AND (COALESCE(rs.triedsCount, 0) + COALESCE(rs.aiTriedsCount, 0)) > 0
         ORDER BY rs.totalScore DESC
         """,
-            countQuery = "SELECT COUNT(rs) FROM RankingStudent rs WHERE rs.ranking.rankingId = :rankingId")
+            countQuery = """
+        SELECT COUNT(rs) FROM RankingStudent rs
+        WHERE rs.ranking.rankingId = :rankingId
+          AND (COALESCE(rs.triedsCount, 0) + COALESCE(rs.aiTriedsCount, 0)) > 0
+        """)
     Page<RankingStudent> findLeaderboard(String rankingId, Pageable pageable);
 
     boolean existsByRankingRankingIdAndStudentIdAndProgramId(

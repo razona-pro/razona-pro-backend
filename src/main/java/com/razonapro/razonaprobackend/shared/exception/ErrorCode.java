@@ -43,6 +43,7 @@ public enum ErrorCode {
 
     // ── Negocio (4xx) ─────────────────────────────────────────────────────
     PROGRAM_NOT_FOUND         (HttpStatus.BAD_REQUEST,       "El código no corresponde a ningún programa registrado."),
+    PROGRAM_DISABLED          (HttpStatus.FORBIDDEN,         "El programa asociado a tu código no está disponible. Contacta al administrador."),
     TEST_NO_QUESTIONS         (HttpStatus.BAD_REQUEST,       "El test no tiene preguntas activas."),
     TEST_DISABLED             (HttpStatus.BAD_REQUEST,       "El test no está disponible."),
     QUESTION_NO_CORRECT_OPTION(HttpStatus.BAD_REQUEST,       "Debe haber al menos una opción correcta."),

@@ -96,18 +96,16 @@ public class TestService {
     }
 
     @Transactional(readOnly = true)
-    public List<QuestionDto> getTestQuestions(String testId, boolean showCorrect) {
+    public List<QuestionDto> getTestQuestions(String testId, boolean showCorrect, String triedId) {
         // Test-wide: incluye preguntas de TODAS las competencias asociadas a la prueba.
         List<TestQuestion> tqs = testQuestionRepository.findByTestIdAndIsActiveTrue(testId);
         Test test = testRepository.findByTestId(testId)
                 .orElseThrow(() -> new ResourceNotFoundException("Test", testId));
 
-        List<TestQuestion> selected = tqs;
-        if (test.getQuestionsToPresent() != null && test.getQuestionsToPresent() < tqs.size()) {
-            selected = new ArrayList<>(tqs);
-            Collections.shuffle(selected);
-            selected = selected.subList(0, test.getQuestionsToPresent());
-        }
+        // Subconjunto DETERMINISTA por intento (mismo intento → mismas preguntas, resiste recargas).
+        // Sin triedId (p. ej. vista previa de admin) se devuelven TODAS, sin barajar.
+        List<TestQuestion> selected = com.razonapro.razonaprobackend.domain.test.util.TestQuestionSelector
+                .selectForTried(tqs, test.getQuestionsToPresent(), triedId);
 
         return selected.stream().map(tq -> {
             var q = questionRepository.findById(new QuestionId(tq.getCompetenceId(), tq.getQuestionId())).orElseThrow();

@@ -119,6 +119,12 @@ public class AuthService {
             throw new ApiException(ErrorCode.INVALID_CREDENTIALS);
         if (!Boolean.TRUE.equals(student.getIsActive()))
             throw new ApiException(ErrorCode.ACCOUNT_DISABLED);
+        // Si el programa del estudiante fue desactivado, tampoco puede entrar.
+        boolean programActive = programRepository.findById(student.getProgramId())
+                .map(p -> Boolean.TRUE.equals(p.getIsActive()))
+                .orElse(false);
+        if (!programActive)
+            throw new ApiException(ErrorCode.PROGRAM_DISABLED);
         if (!Boolean.TRUE.equals(student.getEmailVerified()))
             throw new ApiException(ErrorCode.EMAIL_NOT_VERIFIED);
         if (!passwordEncoder.matches(password, student.getPasswordHash()))
@@ -141,8 +147,11 @@ public class AuthService {
         String email     = req.getEmail().trim().toLowerCase();
         String phone     = req.getPhone().trim();
 
-        if (!programRepository.existsById(programId))
-            throw new ApiException(ErrorCode.PROGRAM_NOT_FOUND);
+        // El programa debe EXISTIR y estar ACTIVO para permitir el registro.
+        var program = programRepository.findById(programId)
+                .orElseThrow(() -> new ApiException(ErrorCode.PROGRAM_NOT_FOUND));
+        if (!Boolean.TRUE.equals(program.getIsActive()))
+            throw new ApiException(ErrorCode.PROGRAM_DISABLED);
         if (studentRepository.existsByStudentId(studentId))
             throw new ApiException(ErrorCode.CODE_ALREADY_EXISTS);
         if (studentRepository.existsByEmail(email))

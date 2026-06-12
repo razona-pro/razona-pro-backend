@@ -76,6 +76,16 @@ public class TriedController {
         return ResponseEntity.ok(ApiResponse.ok(triedService.getReview(triedId, principal)));
     }
 
+    @PostMapping("/{triedId}/forfeit-review")
+    @PreAuthorize("hasRole('STUDENT')")
+    @Operation(summary = "El estudiante renuncia a su retroalimentación de un solo uso (al salir sin verla)")
+    public ResponseEntity<ApiResponse<Void>> forfeitReview(
+            @PathVariable String triedId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        triedService.forfeitReview(triedId, principal);
+        return ResponseEntity.ok(ApiResponse.ok("Review marcado como no consultado"));
+    }
+
     @GetMapping("/{triedId}/breakdown")
     @PreAuthorize("hasAnyRole('ADMIN','STUDENT')")
     @Operation(summary = "Desglose de aciertos por competencia (sin revelar respuestas; lo ve el estudiante dueño)")

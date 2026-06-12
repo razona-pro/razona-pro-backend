@@ -29,6 +29,13 @@ public interface TestQuestionRepository extends JpaRepository<TestQuestion, Inte
     Optional<TestQuestion> findByTestIdAndQuestionIdAndIsActiveTrue(String testId, String questionId);
     boolean existsByTestIdAndQuestionIdAndIsActiveTrue(String testId, String questionId);
 
+    /**
+     * Variante TOLERANTE: el mismo question_id puede existir bajo varias competencias
+     * dentro de una prueba (banco multi-competencia con ids reutilizados). Devuelve TODAS
+     * las filas activas para resolver la competencia sin lanzar NonUniqueResultException.
+     */
+    List<TestQuestion> findAllByTestIdAndQuestionIdAndIsActiveTrue(String testId, String questionId);
+
     @org.springframework.data.jpa.repository.Query("""
         SELECT tq.question.difficultyLevel, COUNT(tq)
         FROM TestQuestion tq

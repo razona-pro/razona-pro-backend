@@ -381,9 +381,9 @@ public class AiTriedService {
      * NO se normaliza a 100. Fuente de verdad única en Java (sin triggers de cálculo).
      */
     private void finishAiTried(AiTried at, List<AiQuestion> questions) {
-        at.setStatus("FINISHED");
-        at.setFinishedAt(LocalDateTime.now());
-
+        // El status pasa a FINISHED al FINAL (ver nota en TriedService.finishTried):
+        // si se marcara aquí, el flush de persistTheta dispararía el trigger de ranking
+        // con score aún nulo y el puntaje aparecería "una sesión tarde".
         int earned = 0, correct = 0, answered = 0, maxPts = 0;
         for (AiQuestion q : questions) {
             int pts = q.getDifficultyLevel() != null ? q.getDifficultyLevel() : 5;
@@ -415,7 +415,11 @@ public class AiTriedService {
             persistTheta(at, cid, finalTheta, answeredForComp);
         }
 
-        // El ranking se actualiza por trigger (trg_update_ranking_on_ai_tried) al pasar a FINISHED.
+        // Recién ahora (con score y theta ya calculados) pasamos a FINISHED: el save() del
+        // llamador hace un único UPDATE con status + score juntos y el trigger
+        // trg_update_ranking_on_ai_tried recalcula el ranking al instante.
+        at.setStatus("FINISHED");
+        at.setFinishedAt(LocalDateTime.now());
     }
 
     /** Lee el theta acumulado del usuario en la competencia (0.0 si no existe). */

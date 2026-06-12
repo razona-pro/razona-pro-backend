@@ -37,6 +37,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -217,6 +218,26 @@ public class TriedService {
     }
 
     /**
+     * Renuncia a la retroalimentación de un solo uso: si el estudiante sale de la pantalla
+     * de resultados SIN abrir el review, lo marcamos como visto para que la URL directa ya
+     * no lo muestre ("decidiste no ver tus respuestas"). Idempotente; admins no se afectan.
+     */
+    @Transactional
+    public void forfeitReview(String triedId, UserPrincipal principal) {
+        boolean isAdmin = principal.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        if (isAdmin) return;
+        Tried tried = triedRepository.findByTriedId(triedId).orElse(null);
+        if (tried == null) return;
+        // Solo el dueño puede renunciar a SU review.
+        if (!tried.getStudentId().equals(principal.getId())) return;
+        if (!Boolean.TRUE.equals(tried.getReviewViewed())) {
+            tried.setReviewViewed(true);
+            triedRepository.save(tried);
+        }
+    }
+
+    /**
      * Desglose de aciertos por competencia de un intento finalizado, SIN revelar las
      * respuestas correctas ni las explicaciones. Lo puede ver el propio estudiante
      * (a diferencia del review completo, que es solo para administradores).
@@ -317,17 +338,18 @@ public class TriedService {
                     "La prueba requiere " + toPresent + " preguntas pero solo tiene "
                             + tqs.size() + " asignada(s).");
 
-        List<TestQuestion> selected = new ArrayList<>(tqs);
-        if (test.getQuestionsToPresent() != null && test.getQuestionsToPresent() < tqs.size()) {
-            Collections.shuffle(selected);
-            selected = selected.subList(0, test.getQuestionsToPresent());
-        }
+        // El id del intento se genera ANTES para sembrar la selección determinista:
+        // así getTestQuestions(testId, triedId) y createUnansweredResponses eligen EXACTAMENTE
+        // el mismo subconjunto que aquí (resiste recargas y evita inconsistencias).
+        String newTriedId = IdGenerator.triedId(triedRepository.count());
+        List<TestQuestion> selected = com.razonapro.razonaprobackend.domain.test.util.TestQuestionSelector
+                .selectForTried(tqs, toPresent, newTriedId);
 
         Tried tried = Tried.builder()
                 .testId(req.getTestId())
                 .programId(principal.getProgramId())
                 .studentId(principal.getId())
-                .triedId(IdGenerator.triedId(triedRepository.count()))
+                .triedId(newTriedId)
                 .totalQuestions(selected.size())
                 .build();
         triedRepository.save(tried);
@@ -368,9 +390,24 @@ public class TriedService {
 
         // Resolver la competencia REAL de la pregunta dentro de esta prueba
         // (multi-competencia: puede diferir de la competencia principal del test).
-        TestQuestion tq = testQuestionRepository
-                .findByTestIdAndQuestionIdAndIsActiveTrue(tried.getTestId(), req.getQuestionId())
-                .orElseThrow(() -> new ApiException(ErrorCode.INVALID_INPUT, "Pregunta no pertenece a este test"));
+        // El banco puede reutilizar el mismo question_id en varias competencias, así que
+        // (test_id + question_id) NO es único: si el frontend envía competenceId lo usamos
+        // de forma exacta; si no, tomamos la primera fila activa para no reventar.
+        TestQuestion tq;
+        if (StringUtils.hasText(req.getCompetenceId())) {
+            tq = testQuestionRepository
+                    .findByCompetenceIdAndTestIdAndQuestionId(
+                            req.getCompetenceId(), tried.getTestId(), req.getQuestionId())
+                    .filter(t -> Boolean.TRUE.equals(t.getIsActive()))
+                    .orElseThrow(() -> new ApiException(ErrorCode.INVALID_INPUT,
+                            "Pregunta no pertenece a este test"));
+        } else {
+            tq = testQuestionRepository
+                    .findAllByTestIdAndQuestionIdAndIsActiveTrue(tried.getTestId(), req.getQuestionId())
+                    .stream().findFirst()
+                    .orElseThrow(() -> new ApiException(ErrorCode.INVALID_INPUT,
+                            "Pregunta no pertenece a este test"));
+        }
         String qComp = tq.getCompetenceId();
 
         Option selectedOption = optionRepository.findById(
@@ -599,9 +636,13 @@ public class TriedService {
     }
 
     private void createUnansweredResponses(Tried tried) {
-        // Test-wide: cubre las preguntas de TODAS las competencias de la prueba.
-        List<TestQuestion> testQuestions = testQuestionRepository
-                .findByTestIdAndIsActiveTrue(tried.getTestId());
+        // Solo las preguntas REALMENTE PRESENTADAS (mismo subconjunto determinista por intento
+        // que vio el estudiante), no todo el banco. Cubre todas las competencias del subconjunto.
+        List<TestQuestion> all = testQuestionRepository.findByTestIdAndIsActiveTrue(tried.getTestId());
+        Integer toPresent = testRepository.findByTestId(tried.getTestId())
+                .map(Test::getQuestionsToPresent).orElse(null);
+        List<TestQuestion> testQuestions = com.razonapro.razonaprobackend.domain.test.util.TestQuestionSelector
+                .selectForTried(all, toPresent, tried.getTriedId());
         long base = responseRepository.count();
         int idx = 0;
         for (TestQuestion tq : testQuestions) {
@@ -624,12 +665,18 @@ public class TriedService {
     }
 
     private void finishTried(Tried tried) {
-        tried.setStatus("FINISHED");
-        tried.setFinishedAt(LocalDateTime.now());
+        // IMPORTANTE: calcular el puntaje ANTES de pasar a FINISHED.
+        // El trigger trg_update_ranking_on_tried dispara con AFTER UPDATE OF status y suma
+        // solo trieds FINISHED con score NOT NULL. Si marcáramos FINISHED primero, el flush
+        // que provoca createUnansweredResponses persistiría status=FINISHED con score aún nulo:
+        // el trigger correría sin este intento y, como el UPDATE posterior solo cambia el score
+        // (no el status), no volvería a dispararse → el puntaje aparecía "un test tarde".
         createUnansweredResponses(tried);
         calculateScore(tried);
-        // Los rankings se actualizan automáticamente por el trigger trg_update_ranking_on_tried
-        // cuando el intento pasa a FINISHED (no se recalcula desde Java).
+        tried.setStatus("FINISHED");
+        tried.setFinishedAt(LocalDateTime.now());
+        // Con este orden, el save() del llamador hace UN solo UPDATE (status + score juntos)
+        // y el trigger recalcula el ranking al instante con el puntaje correcto.
     }
 
     private void assertOwnership(Tried tried, UserPrincipal principal) {

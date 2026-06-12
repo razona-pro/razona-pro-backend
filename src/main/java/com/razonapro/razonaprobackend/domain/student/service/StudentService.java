@@ -55,10 +55,11 @@ public class StudentService {
         Student s = studentRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Estudiante", studentId));
 
-        if (StringUtils.hasText(req.getFirstName()))     s.setFirstName(req.getFirstName());
-        if (StringUtils.hasText(req.getSecondName()))    s.setSecondName(req.getSecondName());
-        if (StringUtils.hasText(req.getFirstSurname()))  s.setFirstSurname(req.getFirstSurname());
-        if (StringUtils.hasText(req.getSecondSurname())) s.setSecondSurname(req.getSecondSurname());
+        if (StringUtils.hasText(req.getFirstName()))     s.setFirstName(req.getFirstName().trim());
+        // Segundo nombre/apellido opcionales: campo presente (aunque vacío) → se aplica/borra.
+        if (req.getSecondName() != null)                 s.setSecondName(req.getSecondName().isBlank() ? null : req.getSecondName().trim());
+        if (StringUtils.hasText(req.getFirstSurname()))  s.setFirstSurname(req.getFirstSurname().trim());
+        if (req.getSecondSurname() != null)              s.setSecondSurname(req.getSecondSurname().isBlank() ? null : req.getSecondSurname().trim());
         if (StringUtils.hasText(req.getEmail())) {
             String email = req.getEmail().trim().toLowerCase();
             if (!email.equalsIgnoreCase(s.getEmail()) && studentRepository.existsByEmailIgnoreCase(email))
