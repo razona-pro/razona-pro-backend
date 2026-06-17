@@ -1,27 +1,36 @@
 package com.razonapro.razonaprobackend.infrastructure.email;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.razonapro.razonaprobackend.infrastructure.config.AppProperties;
-import jakarta.mail.internet.InternetAddress;
-import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class EmailService {
 
-    private final JavaMailSender mailSender;
-    private final AppProperties  appProperties;
+    private final AppProperties appProperties;
+    private final ObjectMapper  objectMapper;
 
+    private static final String BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
     private static final String BRAND_COLOR = "#D41224";
     private static final String BRAND_DARK  = "#9B1F24";
     private static final String SENDER_NAME = "RazonaPro";
 
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .build();
     // Estilos inline para el botón CTA (CSS en <style> lo ignoran Gmail/Outlook)
     private static final String BTN_STYLE =
         "display:inline-block;background-color:#D41224;color:#ffffff;text-decoration:none;" +
@@ -97,13 +106,28 @@ public class EmailService {
 
     private void send(String to, String subject, String html) {
         try {
-            MimeMessage msg = mailSender.createMimeMessage();
-            MimeMessageHelper h = new MimeMessageHelper(msg, true, "UTF-8");
-            h.setFrom(new InternetAddress(appProperties.getMailFrom(), SENDER_NAME));
-            h.setTo(to.toLowerCase());
-            h.setSubject(subject);
-            h.setText(html, true);
-            mailSender.send(msg);
+            Map<String, Object> body = Map.of(
+                    "sender", Map.of("name", SENDER_NAME, "email", appProperties.getMailFrom()),
+                    "to", List.of(Map.of("email", to.toLowerCase())),
+                    "subject", subject,
+                    "htmlContent", html
+            );
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(BREVO_API_URL))
+                    .header("Content-Type", "application/json")
+                    .header("Accept", "application/json")
+                    .header("api-key", appProperties.getMailApiKey())
+                    .timeout(Duration.ofSeconds(15))
+                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() / 100 != 2) {
+                log.error("Brevo respondió {} al enviar a {}: {}", response.statusCode(), to, response.body());
+                return;
+            }
             log.info("Correo enviado a {} [{}]", to, subject);
         } catch (Exception e) {
             log.error("Error enviando correo a {} : {}", to, e.getMessage(), e);

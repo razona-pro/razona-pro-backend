@@ -11,6 +11,7 @@ public class AppProperties {
 
     private String frontendUrl;
     private String mailFrom;
+    private String mailApiKey;
 
     private final AdminInitializer adminInitializer = new AdminInitializer();
 
